@@ -1,0 +1,162 @@
+body {
+    font-family: Arial;
+    background: #f4f7fb;
+}
+
+/* Card */
+.card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Heading */
+.section-heading {
+    font-size: 22px;
+    font-weight: bold;
+    color: #1e3c72;
+    border-left: 6px solid #FF8E00;
+    padding-left: 12px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Button */
+.btn {
+    background: linear-gradient(135deg,#FF8E00,#ffb347);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Table wrapper */
+.table-wrapper {
+    overflow: auto;
+}
+
+/* Header styling */
+table.dataTable thead th {
+    background: linear-gradient(135deg,#1e3c72,#2a5298) !important;
+    color: #fff !important;
+    white-space: nowrap;
+}
+
+/* Fix scroll header */
+.dataTables_scrollHead {
+    background: #1e3c72;
+}
+
+.dataTables_scrollHeadInner {
+    background: #1e3c72;
+}
+
+/* Rows */
+table.dataTable tbody tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+.dataTables_processing {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    background: rgba(0,0,0,0.7) !important;
+    color: #fff !important;
+    padding: 10px 20px !important;
+    border-radius: 5px;
+    z-index: 9999 !important;
+}
+
+     /* 🔥 FILTER PANEL */
+ .filters-panel {
+     margin-bottom: 15px;
+     border: 1px solid #ddd;
+     border-radius: 8px;
+     background: #fafafa;
+     padding: 10px 15px;
+ }
+
+/* Toggle */
+.filter-toggle {
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+/* Container */
+.filters-container {
+    margin-top: 10px;
+}
+
+/* 🔥 GRID → Horizontal Layout */
+.filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+/* Each filter */
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Label */
+.filter-group label {
+    font-size: 13px;
+    margin-bottom: 4px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* Input */
+.filter-input {
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 13px;
+    background: #fff;
+}
+
+/* 🔥 Buttons Row */
+.filter-actions {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn {
+    padding: 7px 12px;
+    border: none;
+    border-radius: 5px;
+    background: #007bff;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.btn:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+/* 🔥 Responsive Fix */
+@media (max-width: 768px) {
+    .filters-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+}
