@@ -1,6 +1,10 @@
 <?php
 session_start();
 include("../scripts/settings.php");
+echo '<base href="../">';
+page_header_start();
+page_header_end();
+page_sidebar();
 
 $authority_id = isset($_GET['authority_id']) ? intval($_GET['authority_id']) : 0;
 $user_type = $_SESSION['user_type'] ?? '';
@@ -172,11 +176,6 @@ function getIconAndColor($name, $index) {
 
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Cooperative Types Dashboard</title>
-    <meta charset="UTF-8">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -241,34 +240,6 @@ function getIconAndColor($name, $index) {
             font-size: 17px;
             font-weight: bold;
             color: #1a5276;
-        }
-
-        .nav {
-            background: #1a5276;
-            display: flex;
-            padding: 0 16px;
-             padding: 10px 18px;
-            align-items: center;
-        }
-
-
-
-        .nav a:hover,
-        .nav a.active {
-            background: #154360;
-        }
-
-        .nav .login-btn {
-            background: #e74c3c;
-            border-radius: 4px;
-            margin: 6px 0 6px 8px;
-            padding: 5px 16px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .nav .login-btn:hover {
-            background: #c0392b;
         }
 
         .dashboard {
@@ -359,50 +330,11 @@ function getIconAndColor($name, $index) {
 
 <body>
 
-<!-- Top Bar -->
-<div class="top-bar">
-    <span>UTTAR PRADESH COOPERATIVE DATABASE CENTER (UPCDC)</span>
-    <span>English &#9662;</span>
-</div>
-
-<!-- Brand Bar -->
-<div class="brand-bar">
-    <div class="brand-logos">
-        <div class="logo-circle" style="background:#f5f0ff; border-color:#7c3aed; color:#5b21b6;">   <a href="https://cooperatives.gov.in/" target="_blank" class="site_logo" rel="home">
-
-                            <img id="logo" class="emblem" src="img/coop_logo.png" alt=""
-
-                                style="width: 75px;height: 74px;">
-
-                        </a></div>
-
-    </div>
-     <div class="brand-title">
-        <div class="hindi">उत्तर प्रदेश को-आपरेटिव डेटाबेस सेंटर</div>
-        <div class="english">Uttar Pradesh Cooperative Database Center</div>
-    </div>
-    <div style="text-align:center; font-size:11px; color:#1a5276; font-weight:500; line-height:1.5;">
-        <div class="logo-circle" style="background:#fff0f0; border-color:#c0392b; color:#7b1818;">   <a href="https://cooperatives.gov.in/" target="_blank" class="site_logo" rel="home">
-
-                            <img id="logo" class="emblem" src="img/up_logo1.jpeg" alt=""
-
-                                style="width: 75px;height: 74px;">
-
-                        </a>
-        </div>
-    </div>
-</div>
-
-<!-- Navigation -->
-<nav class="nav">
-
-</nav>
-
 <!-- Dashboard -->
 <div class="dashboard">
 
     <!-- Back to main dashboard -->
-    <a href="dashboard_cooperatives.php" class="back-btn">&#9668; Back to Dashboard</a>
+    <a href="Ncd_Reports/dashboard_cooperatives.php" class="back-btn">&#9668; Back to Dashboard</a>
 
     <div class="section-title">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -411,12 +343,13 @@ function getIconAndColor($name, $index) {
             <rect x="3" y="14" width="7" height="7" rx="1"/>
             <rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
-        Cooperative Types Dashboard
+        Cooperative Societies Types
     </div>
 
     <div class="grid">
 
         <!-- ALL TYPES -->
+        <?php if (isset($_SESSION['usertype']) && $_SESSION['usertype'] === 'sadmin'): ?>
         <div class="card" onclick="goToData('all')">
             <div class="icon-wrap" style="background:#fee2e2;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="1.6">
@@ -425,9 +358,10 @@ function getIconAndColor($name, $index) {
                     <path d="M3 20c0-3.31 2.69-6 6-6h6c3.31 0 6 2.69 6 6"/>
                 </svg>
             </div>
-            <div class="card-label">All Types Of Societies</div>
+            <div class="card-label">All  Of Societies</div>
             <div class="badge" style="background:#e74c3c;"><?= $totalAll ?></div>
         </div>
+        <?php endif; ?>
 
         <!-- Dynamic Types -->
         <?php
@@ -452,7 +386,7 @@ function getIconAndColor($name, $index) {
 
 <script>
     function goToData(typeId) {
-        let url = "ncd_cooperatives_info.php";
+        let url = "Ncd_Reports/ncd_cooperatives_info.php";
         let params = new URLSearchParams();
 
         // always pass authority_id
@@ -466,6 +400,7 @@ function getIconAndColor($name, $index) {
         window.open(url + '?' + params.toString(), '_blank');
     }
 </script>
-
-</body>
-</html>
+<?php
+page_footer_start();
+page_footer_end();
+?>

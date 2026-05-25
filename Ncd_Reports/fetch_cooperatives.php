@@ -10,7 +10,7 @@ $request = $_REQUEST;
 
 // columns
 $columns = [];
-$resCols = execute_query("SHOW COLUMNS FROM cooperatives");
+$resCols = execute_query("SHOW COLUMNS FROM ncd_cooperative_registrations");
 
 while ($c = mysqli_fetch_assoc($resCols)) {
     if (in_array($c['Field'], ['created_at', 'updated_at'])) continue;

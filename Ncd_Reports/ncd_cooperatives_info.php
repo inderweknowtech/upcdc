@@ -1,6 +1,10 @@
 <?php
-session_start();
+// session_start();
 include("../scripts/settings.php");
+echo '<base href="../">';
+page_header_start();
+page_header_end();
+page_sidebar();
 include("helpers/filter_builder.php");
 
 $authority_id = isset($_GET['authority_id']) ? intval($_GET['authority_id']) : 0;
@@ -85,6 +89,15 @@ elseif ($user_type === 'ncd_checker') {
 else {
     $session_district_filter = "";
 }
+
+
+//echo $division_id;
+//
+//echo '==========';
+//
+//echo '<pre>';
+//
+//print_r($session_district_filter); exit;
 
 function formatColumnName($col){
 
@@ -215,34 +228,6 @@ if ($authority_id > 0) {
             color: #1a5276;
         }
 
-        .nav {
-            background: #1a5276;
-            display: flex;
-            padding: 0 16px;
-            padding: 10px 18px;
-            align-items: center;
-        }
-
-
-
-        .nav a:hover,
-        .nav a.active {
-            background: #154360;
-        }
-
-        .nav .login-btn {
-            background: #e74c3c;
-            border-radius: 4px;
-            margin: 6px 0 6px 8px;
-            padding: 5px 16px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .nav .login-btn:hover {
-            background: #c0392b;
-        }
-
         .dashboard {
             padding: 24px 20px;
         }
@@ -261,12 +246,12 @@ if ($authority_id > 0) {
             background: #ffffff;
             border-radius: 12px;
             border: 1px solid #e2e8f0;
-            padding: 18px 14px 14px;
+            padding: 18px 18px 14px;
             margin-bottom: 20px;
         }
 
         .section-heading {
-            font-size: 18px;
+            font-size: 28px;
             font-weight: bold;
             color: #1a5276;
             margin-bottom: 18px;
@@ -492,7 +477,7 @@ if ($authority_id > 0) {
         table.dataTable tbody td {
             padding: 12px;
             border-bottom: 1px solid #f1f5f9;
-            font-size: 13px;
+            font-size: 14px;
             color: #374151;
         }
 
@@ -560,45 +545,11 @@ if ($authority_id > 0) {
             text-align: right;
             margin: 10px;
         }
+
     </style>
 </head>
 
 <body>
-
-<!-- Top Bar -->
-<div class="top-bar">
-    <span>UTTAR PRADESH COOPERATIVE DATABASE CENTER (UPCDC)</span>
-    <span>English &#9662;</span>
-</div>
-
-<!-- Brand Bar -->
-<div class="brand-bar">
-    <div class="brand-logos">
-        <div class="logo-circle" style="background:#f5f0ff; border-color:#7c3aed; color:#5b21b6;">   <a href="https://cooperatives.gov.in/" target="_blank" class="site_logo" rel="home">
-
-                <img id="logo" class="emblem" src="img/coop_logo.png" alt=""
-
-                     style="width: 75px;height: 74px;">
-
-            </a></div>
-
-    </div>
-    <div class="brand-title">
-        <div class="hindi">उत्तर प्रदेश को-आपरेटिव डेटाबेस सेंटर</div>
-        <div class="english">Uttar Pradesh Cooperative Database Center</div>
-    </div>
-    <div style="text-align:center; font-size:11px; color:#1a5276; font-weight:500; line-height:1.5;">
-        <div class="logo-circle" style="background:#fff0f0; border-color:#c0392b; color:#7b1818;">   <a href="https://cooperatives.gov.in/" target="_blank" class="site_logo" rel="home">
-
-                <img id="logo" class="emblem" src="img/up_logo1.jpeg" alt=""
-
-                     style="width: 75px;height: 74px;">
-
-            </a>
-        </div>
-    </div>
-</div>
-
 <!-- Navigation -->
 <nav class="nav">
 
@@ -608,7 +559,7 @@ if ($authority_id > 0) {
 <div class="dashboard">
 
     <!-- Back to dashboard -->
-    <a href="dashboard_cooperative_types.php?authority_id=<?= $authority_id ?>" class="back-btn">&#9668; Back to Dashboard</a>
+    <a href="Ncd_Reports/dashboard_cooperative_types.php?authority_id=<?= $authority_id ?>" class="back-btn">&#9668; Back to Dashboard</a>
 
     <div class="card">
 
@@ -619,7 +570,7 @@ if ($authority_id > 0) {
                 <rect x="3" y="14" width="7" height="7" rx="1"/>
                 <rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
-            Cooperatives Data
+            Cooperatives Societies
             <button class="btn" onclick="exportData()">
                 &#128171; Download Excel
             </button>
@@ -803,14 +754,24 @@ if ($authority_id > 0) {
     <div class="table-wrapper">
         <table id="tbl" class="display nowrap" style="width:100%">
             <thead>
-                    <tr>
-                        <th>Sr No</th>
-                        <th>Status</th>
-                        <?php foreach($cols as $c){ ?>
-                            <th><?= formatColumnName($c) ?></th>
-                        <?php } ?>
-                        <th>Action</th>
-                    </tr>
+<!--                    <tr>-->
+<!--                        <th>Sr No</th>-->
+<!--                        <th>Status</th>-->
+<!--                        --><?php //foreach($cols as $c){ ?>
+<!--                            <th>--><?//= formatColumnName($c) ?><!--</th>-->
+<!--                        --><?php //} ?>
+<!--                        <th>Action</th>-->
+<!--                    </tr>-->
+
+                        <tr>
+                            <th>Action</th>
+                            <th>Sr No</th>
+                            <th>Status</th>
+
+                            <?php foreach($cols as $c){ ?>
+                                <th><?= formatColumnName($c) ?></th>
+                            <?php } ?>
+                        </tr>
             </thead>
         </table>
     </div>
@@ -822,7 +783,63 @@ if ($authority_id > 0) {
     let filtersClosed = false;
 
     $(document).ready(function(){
+        //let columns = [
+        //
+        //    {
+        //        data: null,
+        //        title: "Sr No",
+        //        orderable: false,
+        //        searchable: false,
+        //        render: function (data, type, row, meta) {
+        //            return meta.row + meta.settings._iDisplayStart + 1;
+        //        }
+        //    },
+        //    {
+        //        data: null,
+        //        title: "Status",
+        //        render: function (data, type, row) {
+        //
+        //            let text = row.status_text || "Not Available";
+        //            let color = row.status_color || "#777";
+        //
+        //            return `<span style="font-weight:600; color:${color};">${text}</span>`;
+        //        }
+        //    },
+        //
+        //    <?php //foreach($cols as $c){ ?>
+        //    { data: "<?//= $c ?>//" },
+        //    <?php //} ?>
+        //    {
+        //        data: "id",
+        //        orderable: false,
+        //        searchable: false,
+        //        render: function(data, type, row) {
+        //            return `
+        //        <a href="cooperative_view.php?id=${data}"
+        //           style="text-decoration:none; font-size:16px;">
+        //           ✏️
+        //        </a>
+        //    `;
+        //        }
+        //    }
+        //]
+
         let columns = [
+
+            {
+                data: "id",
+                title: "Action",
+                orderable: false,
+                searchable: false,
+                render: function(data, type, row) {
+                    return `
+                <a href="cooperative_view.php?id=${data}"
+                   style="text-decoration:none; font-size:16px;">
+                   ✏️
+                </a>
+            `;
+                }
+            },
 
             {
                 data: null,
@@ -833,6 +850,7 @@ if ($authority_id > 0) {
                     return meta.row + meta.settings._iDisplayStart + 1;
                 }
             },
+
             {
                 data: null,
                 title: "Status",
@@ -848,19 +866,6 @@ if ($authority_id > 0) {
             <?php foreach($cols as $c){ ?>
             { data: "<?= $c ?>" },
             <?php } ?>
-            {
-                data: "id",
-                orderable: false,
-                searchable: false,
-                render: function(data, type, row) {
-                    return `
-                <a href="cooperative_view.php?id=${data}"
-                   style="text-decoration:none; font-size:16px;">
-                   ✏️
-                </a>
-            `;
-                }
-            }
         ];
 
         dataTable = $('#tbl').DataTable({
@@ -872,7 +877,7 @@ if ($authority_id > 0) {
             pageLength: 25,
             fixedHeader: true,
             ajax: {
-                url: 'fetch_cooperatives.php',
+                url: 'Ncd_Reports/fetch_cooperatives.php',
                 type: 'POST',
                 data: function(d){
                     // Add authority_id
@@ -911,7 +916,7 @@ if ($authority_id > 0) {
             let data = dataTable.row(this).data();
 
             if (data && data.id) {
-                window.location.href = 'cooperative_view.php?id=' + data.id;
+                window.location.href = 'Ncd_Reports/cooperative_view.php?id=' + data.id;
             }
         });
 
@@ -1084,7 +1089,9 @@ if ($authority_id > 0) {
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         }
     }
-
+    .dataTables_wrapper{
+        padding: 10px;
+    }
     .dataTables_wrapper .dataTables_length {
         float: left;
         margin: 10px;
@@ -1103,4 +1110,19 @@ if ($authority_id > 0) {
         background-color: #eef5ff !important;
     }
 
+    #tbl thead th,
+    table.dataTable thead th {
+        background: #1a5276 !important;
+        color: #ffffff !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        text-shadow: none !important;
+        border-color: #1a5276 !important;
+    }
+
+    table.dataTable thead {
+        display: table-header-group !important;
+    }
 </style>

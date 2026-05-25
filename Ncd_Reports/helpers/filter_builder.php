@@ -113,18 +113,58 @@ function buildCooperativeFilters($request) {
         }
     }
 
-    // 🔥 District filter (SESSION BASED)
+    // 🔥 District Filter (SESSION BASED) on the basis if checker division and maker district
 
-    $district = '';
-    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'ncd_maker') {
-        $district = $_SESSION['district_id'] ?? '';
-    }
-    if (!empty($district)) {
-        if ($district > 0) {
-            $where .= " AND c.district_code = $district";
+    $user_type = $_SESSION['user_type'] ?? '';
+
+// ✅ MAKER → single district
+    if ($user_type === 'ncd_maker') {
+
+        $district_id = (int)($_SESSION['district_id'] ?? 0);
+
+        if ($district_id > 0) {
+            $where .= " AND c.district_code = $district_id ";
         }
     }
+
+// ✅ CHECKER → multiple districts via division
+    elseif ($user_type === 'ncd_checker') {
+
+        $division_id = $_SESSION['division_id'] ?? '';
+
+        $districts = [];
+
+        if (!empty($division_id)) {
+
+            $sql = "
+            SELECT nd.district_code
+            FROM master_district md
+            LEFT JOIN ncd_districts nd
+                ON LOWER(md.district_name) = LOWER(nd.district_name)
+            WHERE md.division_id = '$division_id'
+        ";
+
+            $resDist = execute_query($sql);
+
+            while ($row = mysqli_fetch_assoc($resDist)) {
+
+                if (!empty($row['district_code'])) {
+                    $districts[] = (int)$row['district_code'];
+                }
+            }
+        }
+
+        // Apply IN filter
+        if (!empty($districts)) {
+
+            $district_list = implode(",", $districts);
+
+            $where .= " AND c.district_code IN ($district_list) ";
+        }
+    }
+
     return $where;
+
 }
 
 /**

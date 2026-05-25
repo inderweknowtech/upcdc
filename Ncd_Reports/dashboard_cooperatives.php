@@ -1,7 +1,24 @@
 <?php
 include("../scripts/settings.php");
+echo '<base href="../">';
+page_header_start();
+page_header_end();
+page_sidebar();
 
 $user_type = isset($_SESSION['user_type']) ? $_SESSION['user_type'] : '';
+
+$userSno = isset($_SESSION['usersno']) ? $_SESSION['usersno'] : '';
+$assignedDeptId = null;
+$res = execute_query("
+    SELECT department_authority_id 
+    FROM ncd_users 
+    WHERE id = '$userSno'
+    LIMIT 1
+");
+if ($res && mysqli_num_rows($res) > 0) {
+    $row = mysqli_fetch_assoc($res);
+    $assignedDeptId = $row['department_authority_id'];
+}
 
 $district_id = '';
 $totalAll = 0;
@@ -83,8 +100,6 @@ elseif ($user_type === 'ncd_checker') {
     ");
     $totalAll = mysqli_fetch_assoc($totalRes)['total'];
 }
-
-
 //ADMIN / OTHERS → no district filter
 else {
 
@@ -114,7 +129,7 @@ else {
 // Icon map by authority_name keywords (customize as needed)
 function getIconAndColor($name, $index) {
     $name = strtolower($name ?? '');
-    
+
     $icons = [
         'state federation' => [
             'icon' => '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1e8449" stroke-width="1.6"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/><path d="M12 6l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z"/></svg>',
@@ -217,13 +232,13 @@ function getIconAndColor($name, $index) {
             'bg' => '#fee2e2', 'badge' => '#dc2626'
         ],
     ];
-    
+
     foreach ($icons as $keyword => $data) {
         if (strpos($name, $keyword) !== false) {
             return $data;
         }
     }
-    
+
     // Default fallback colors cycling
     $defaults = [
         ['icon' => '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>', 'bg' => '#ede9fe', 'badge' => '#7c3aed'],
@@ -232,16 +247,11 @@ function getIconAndColor($name, $index) {
         ['icon' => '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="1.6"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'bg' => '#ccfbf1', 'badge' => '#0f766e'],
         ['icon' => '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>', 'bg' => '#fee2e2', 'badge' => '#b91c1c'],
     ];
-    
+
     return $defaults[$index % count($defaults)];
 }
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Cooperative Dashboard</title>
-    <meta charset="UTF-8">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -308,33 +318,6 @@ function getIconAndColor($name, $index) {
             color: #1a5276;
         }
 
-        .nav {
-            background: #1a5276;
-            display: flex;
-            padding: 0 16px;
-             padding: 10px 18px;
-            align-items: center;
-        }
-
-       
-
-        .nav a:hover,
-        .nav a.active {
-            background: #154360;
-        }
-
-        .nav .login-btn {
-            background: #e74c3c;
-            border-radius: 4px;
-            margin: 6px 0 6px 8px;
-            padding: 5px 16px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .nav .login-btn:hover {
-            background: #c0392b;
-        }
 
         .dashboard {
             padding: 24px 20px;
@@ -404,84 +387,89 @@ function getIconAndColor($name, $index) {
             display: inline-block;
             text-align: center;
         }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a5276;
+            margin-bottom: 18px;
+            display: flex;
+            justify-content: space-between; /* KEY */
+            align-items: center;
+        }
+
+        .title-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-btn {
+            background: #1a5276;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #154360;
+        }
     </style>
 </head>
 <body>
-
-<!-- Top Bar -->
-<div class="top-bar">
-    <span>UTTAR PRADESH COOPERATIVE DATABASE CENTER (UPCDC)</span>
-    <span>English ▾</span>
-</div>
-
-<!-- Brand Bar -->
-<div class="brand-bar">
-    <div class="brand-logos">
-        <div class="logo-circle" style="background:#f5f0ff; border-color:#7c3aed; color:#5b21b6;">   <a href="https://cooperatives.gov.in/" target="_blank" class="site_logo" rel="home">
-
-                            <img id="logo" class="emblem" src="img/coop_logo.png" alt=""
-
-                                style="width: 75px;height: 74px;">
-
-                        </a></div>
-       
-    </div>  
-     <div class="brand-title">
-        <div class="hindi">उत्तर प्रदेश को-आपरेटिव डेटाबेस सेंटर</div>
-        <div class="english">Uttar Pradesh Cooperative Database Center</div>
-    </div>
-    <div style="text-align:center; font-size:11px; color:#1a5276; font-weight:500; line-height:1.5;">
-        <div class="logo-circle" style="background:#fff0f0; border-color:#c0392b; color:#7b1818;">   <a href="https://cooperatives.gov.in/" target="_blank" class="site_logo" rel="home">
-
-                            <img id="logo" class="emblem" src="img/up_logo1.jpeg" alt=""
-
-                                style="width: 75px;height: 74px;">
-
-                        </a>
-        </div>
-    </div>
-</div>
-
-<!-- Navigation -->
-<nav class="nav">
-   
-</nav>
 
 <!-- Dashboard -->
 <div class="dashboard">
 
     <div class="section-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
-        </svg>
-        Cooperative Dashboard
+        <div class="title-left">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            Cooperative Societies
+        </div>
+
+        <a href="index_1.php" class="back-btn">
+            ← Back to Main Dashboard
+        </a>
     </div>
 
     <div class="grid">
 
-        <!-- ALL Cooperatives Card -->
-        <div class="card" onclick="goToData('all')">
-            <div class="icon-wrap" style="background:#fee2e2;">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="1.6">
-                    <circle cx="9" cy="8" r="2.5"/>
-                    <circle cx="15" cy="8" r="2.5"/>
-                    <path d="M3 20c0-3.31 2.69-6 6-6h6c3.31 0 6 2.69 6 6"/>
-                </svg>
+        <!--All Types Of Societies-->
+        <?php if (isset($_SESSION['usertype']) && $_SESSION['usertype'] === 'sadmin'): ?>
+            <div class="card" onclick="goToData('all')">
+                <div class="icon-wrap" style="background:#fee2e2;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="1.6">
+                        <circle cx="9" cy="8" r="2.5"/>
+                        <circle cx="15" cy="8" r="2.5"/>
+                        <path d="M3 20c0-3.31 2.69-6 6-6h6c3.31 0 6 2.69 6 6"/>
+                    </svg>
+                </div>
+                <div class="card-label">All Cooperatives Societies</div>
+                <div class="badge" style="background:#e74c3c;"><?= $totalAll ?></div>
             </div>
-            <div class="card-label">All Cooperatives Units</div>
-            <div class="badge" style="background:#e74c3c;"><?= $totalAll ?></div>
-        </div>
+        <?php endif; ?>
+
 
         <!-- Dynamic Cards from DB -->
-        <?php 
+        <?php
         $index = 0;
         while ($row = mysqli_fetch_assoc($res)) {
             $authorityName = $row['authority_name'] ?? 'Other Authorities';
+            $authorityId = $row['registration_authoritie_id'] ?? null;
             $card = getIconAndColor($authorityName, $index);
-        ?>
+
+            //  Only assigned departments can be seen
+            if ($_SESSION['usertype'] != 'sadmin' && $authorityId != $assignedDeptId) {continue;}
+
+            ?>
         <div class="card" onclick="goToData(<?= (int)$row['registration_authoritie_id'] ?>)">
             <div class="icon-wrap" style="background:<?= $card['bg'] ?>;">
                 <?= $card['icon'] ?>
@@ -498,13 +486,14 @@ function getIconAndColor($name, $index) {
 
 <script>
     function goToData(id) {
-        let url = "dashboard_cooperative_types.php";
+    let url = "Ncd_Reports/dashboard_cooperative_types.php";
         if (id !== 'all') {
             url += "?authority_id=" + id;
         }
         window.open(url, '_blank');
     }
 </script>
-
-</body>
-</html>
+<?php
+page_footer_start();
+page_footer_end();
+?>

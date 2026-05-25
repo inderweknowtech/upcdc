@@ -152,19 +152,22 @@ if (!$result) {
 // SUCCESS
 // =======================
 
-// 👇 CALL WORKFLOW
-updateValidationStatus(
-    $db,
-    $id,
-    $user_type,
-    $action,
-    $_POST
-);
+// CALL WORKFLOW
+    updateValidationStatus(
+        $db,
+        $id,
+        $user_type,
+        $action,
+        $_POST
+    );
 
-echo json_encode([
-    "status" => "success",
-    "message" => "Data updated successfully"
-]);
+    echo json_encode([
+        "status" => "success",
+        "message" => "Data updated successfully"
+    ]);
+
+
+
 
 function updateValidationStatus($db, $cooperative_id, $user_type, $action, $post)
 {
@@ -173,42 +176,68 @@ function updateValidationStatus($db, $cooperative_id, $user_type, $action, $post
     // =========================
     // GET LATEST REQUEST
     // =========================
-    $sql = "SELECT * 
-            FROM ncd_cooperatives_validation
-            WHERE ncd_cooperative_id = $cooperative_id
-            ORDER BY request_id DESC
-            LIMIT 1";
+    $res = mysqli_query($db, "
+        SELECT * 
+        FROM ncd_cooperatives_validation
+        WHERE ncd_cooperative_id = $cooperative_id
+        ORDER BY request_id DESC
+        LIMIT 1
+    ");
 
-    $res = mysqli_query($db, $sql);
     $row = mysqli_fetch_assoc($res);
 
     // =========================
-    // FIRST ENTRY
+    // FIRST ENTRY (SAFE INIT)
     // =========================
     if (!$row) {
-        mysqli_query($db, "INSERT INTO ncd_cooperatives_validation (
-            ncd_cooperative_id,
-            request_id,
-            maker_status,
-            checker_status,
-            admin_status,
-            current_stage,
-            final_status
-        ) VALUES (
-            $cooperative_id,
-            1,
-            0,
-            0,
-            0,
-            'maker',
-            'in_progress'
-        )");
-        return;
+        mysqli_query($db, "
+            INSERT INTO ncd_cooperatives_validation (
+                ncd_cooperative_id,
+                request_id,
+                maker_status,
+                checker_status,
+                admin_status,
+                current_stage,
+                final_status
+            ) VALUES (
+                $cooperative_id,
+                1,
+                0,
+                0,
+                0,
+                'maker',
+                'in_progress'
+            )
+        ");
+
+        // reload
+        $res = mysqli_query($db, "
+            SELECT * 
+            FROM ncd_cooperatives_validation
+            WHERE ncd_cooperative_id = $cooperative_id
+            ORDER BY request_id DESC
+            LIMIT 1
+        ");
+
+        $row = mysqli_fetch_assoc($res);
     }
 
     $id = $row['id'];
-    $current_request = $row['request_id'];
+    $current_request = (int)$row['request_id'];
     $next_request = $current_request + 1;
+
+    // =========================
+    // HELPER: PREVENT DUPLICATE VERSION
+    // =========================
+    $versionExists = function() use ($db, $cooperative_id, $next_request) {
+        $check = mysqli_query($db, "
+            SELECT id FROM ncd_cooperatives_validation
+            WHERE ncd_cooperative_id = $cooperative_id
+            AND request_id = $next_request
+            LIMIT 1
+        ");
+        return mysqli_num_rows($check) > 0;
+    };
 
     // =========================
     // MAKER
@@ -221,14 +250,16 @@ function updateValidationStatus($db, $cooperative_id, $user_type, $action, $post
 
         if ($action === 'submit') {
 
-            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+            mysqli_query($db, "
+                UPDATE ncd_cooperatives_validation
                 SET maker_status = 1,
                     checker_status = 0,
                     admin_status = 0,
                     current_stage = 'checker',
                     final_status = 'in_progress',
                     updated_at = NOW()
-                WHERE id = $id");
+                WHERE id = $id
+            ");
         }
     }
 
@@ -237,49 +268,57 @@ function updateValidationStatus($db, $cooperative_id, $user_type, $action, $post
     // =========================
     if ($user_type === 'ncd_checker') {
 
-        // ❗ allow only if maker submitted
-        if ($row['maker_status'] != 1) return;
+        // only if maker submitted
+        if ((int)$row['maker_status'] !== 1) return;
 
         if ($action === 'verify') {
 
-            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+            mysqli_query($db, "
+                UPDATE ncd_cooperatives_validation
                 SET checker_status = 1,
                     current_stage = 'admin',
                     final_status = 'in_progress',
                     updated_at = NOW()
-                WHERE id = $id");
+                WHERE id = $id
+            ");
         }
 
         if ($action === 'checker_reject') {
 
             $remark = mysqli_real_escape_string($db, $post['checker_remark'] ?? '');
 
-            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+            mysqli_query($db, "
+                UPDATE ncd_cooperatives_validation
                 SET checker_status = 2,
                     checker_remark = '$remark',
                     final_status = 'rejected',
                     current_stage = 'completed',
                     updated_at = NOW()
-                WHERE id = $id");
+                WHERE id = $id
+            ");
 
-            // NEW REQUEST
-            mysqli_query($db, "INSERT INTO ncd_cooperatives_validation (
-                ncd_cooperative_id,
-                request_id,
-                maker_status,
-                checker_status,
-                admin_status,
-                current_stage,
-                final_status
-            ) VALUES (
-                $cooperative_id,
-                $next_request,
-                0,
-                0,
-                0,
-                'maker',
-                'in_progress'
-            )");
+            // NEW VERSION → BACK TO MAKER
+            if (!$versionExists()) {
+                mysqli_query($db, "
+                    INSERT INTO ncd_cooperatives_validation (
+                        ncd_cooperative_id,
+                        request_id,
+                        maker_status,
+                        checker_status,
+                        admin_status,
+                        current_stage,
+                        final_status
+                    ) VALUES (
+                        $cooperative_id,
+                        $next_request,
+                        0,
+                        0,
+                        0,
+                        'maker',
+                        'in_progress'
+                    )
+                ");
+            }
         }
     }
 
@@ -288,49 +327,240 @@ function updateValidationStatus($db, $cooperative_id, $user_type, $action, $post
     // =========================
     if ($user_type === 'ncd_admin') {
 
-        // ❗ allow only if checker approved
-        if ($row['checker_status'] != 1) return;
+        // only if checker approved
+        if ((int)$row['checker_status'] !== 1) return;
 
         if ($action === 'approve') {
 
-            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+            mysqli_query($db, "
+                UPDATE ncd_cooperatives_validation
                 SET admin_status = 1,
                     final_status = 'approved',
                     current_stage = 'completed',
                     updated_at = NOW()
-                WHERE id = $id");
+                WHERE id = $id
+            ");
         }
 
         if ($action === 'admin_reject') {
 
             $remark = mysqli_real_escape_string($db, $post['admin_remark'] ?? '');
 
-            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+            mysqli_query($db, "
+                UPDATE ncd_cooperatives_validation
                 SET admin_status = 2,
                     admin_remark = '$remark',
                     final_status = 'rejected',
                     current_stage = 'completed',
                     updated_at = NOW()
-                WHERE id = $id");
+                WHERE id = $id
+            ");
 
-            // NEW REQUEST
-            mysqli_query($db, "INSERT INTO ncd_cooperatives_validation (
-                ncd_cooperative_id,
-                request_id,
-                maker_status,
-                checker_status,
-                admin_status,
-                current_stage,
-                final_status
-            ) VALUES (
-                $cooperative_id,
-                $next_request,
-                0,
-                0,
-                0,
-                'maker',
-                'in_progress'
-            )");
+            //NEW VERSION → BACK TO CHECKER (FIXED)
+            if (!$versionExists()) {
+                mysqli_query($db, "
+                    INSERT INTO ncd_cooperatives_validation (
+                        ncd_cooperative_id,
+                        request_id,
+                        maker_status,
+                        checker_status,
+                        admin_status,
+                        current_stage,
+                        final_status
+                    ) VALUES (
+                        $cooperative_id,
+                        $next_request,
+                        1,  -- maker already done
+                        0,
+                        0,
+                        'checker',
+                        'in_progress'
+                    )
+                ");
+            }
         }
     }
 }
+
+
+
+//function updateValidationStatus($db, $cooperative_id, $user_type, $action, $post)
+//{
+//    $cooperative_id = intval($cooperative_id);
+//
+//    // =========================
+//    // GET LATEST REQUEST
+//    // =========================
+//    $sql = "SELECT *
+//            FROM ncd_cooperatives_validation
+//            WHERE ncd_cooperative_id = $cooperative_id
+//            ORDER BY request_id DESC
+//            LIMIT 1";
+//
+//    $res = mysqli_query($db, $sql);
+//    $row = mysqli_fetch_assoc($res);
+//
+//    // =========================
+//    // FIRST ENTRY
+//    // =========================
+//    if (!$row) {
+//        mysqli_query($db, "INSERT INTO ncd_cooperatives_validation (
+//            ncd_cooperative_id,
+//            request_id,
+//            maker_status,
+//            checker_status,
+//            admin_status,
+//            current_stage,
+//            final_status
+//        ) VALUES (
+//            $cooperative_id,
+//            1,
+//            0,
+//            0,
+//            0,
+//            'maker',
+//            'in_progress'
+//        )");
+////        return;
+//
+//
+//        $res = mysqli_query($db, "
+//        SELECT *
+//        FROM ncd_cooperatives_validation
+//        WHERE ncd_cooperative_id = $cooperative_id
+//        ORDER BY request_id DESC
+//        LIMIT 1
+//    ");
+//
+//        $row = mysqli_fetch_assoc($res);
+//
+//    }
+//
+//    $id = $row['id'];
+//    $current_request = $row['request_id'];
+//    $next_request = $current_request + 1;
+//
+//    // =========================
+//    // MAKER
+//    // =========================
+//    if ($user_type === 'ncd_maker') {
+//
+//        if ($action === 'save') {
+//            return; // no workflow change
+//        }
+//
+//        if ($action === 'submit') {
+//
+//            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+//                SET maker_status = 1,
+//                    checker_status = 0,
+//                    admin_status = 0,
+//                    current_stage = 'checker',
+//                    final_status = 'in_progress',
+//                    updated_at = NOW()
+//                WHERE id = $id");
+//        }
+//    }
+//
+//    // =========================
+//    // CHECKER
+//    // =========================
+//    if ($user_type === 'ncd_checker') {
+//
+//        // ❗ allow only if maker submitted
+//        if ($row['maker_status'] != 1) return;
+//
+//        if ($action === 'verify') {
+//
+//            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+//                SET checker_status = 1,
+//                    current_stage = 'admin',
+//                    final_status = 'in_progress',
+//                    updated_at = NOW()
+//                WHERE id = $id");
+//        }
+//
+//        if ($action === 'checker_reject') {
+//
+//            $remark = mysqli_real_escape_string($db, $post['checker_remark'] ?? '');
+//
+//            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+//                SET checker_status = 2,
+//                    checker_remark = '$remark',
+//                    final_status = 'rejected',
+//                    current_stage = 'completed',
+//                    updated_at = NOW()
+//                WHERE id = $id");
+//
+//            // NEW REQUEST
+//            mysqli_query($db, "INSERT INTO ncd_cooperatives_validation (
+//                ncd_cooperative_id,
+//                request_id,
+//                maker_status,
+//                checker_status,
+//                admin_status,
+//                current_stage,
+//                final_status
+//            ) VALUES (
+//                $cooperative_id,
+//                $next_request,
+//                0,
+//                0,
+//                0,
+//                'maker',
+//                'in_progress'
+//            )");
+//        }
+//    }
+//
+//    // =========================
+//    // ADMIN
+//    // =========================
+//    if ($user_type === 'ncd_admin') {
+//
+//        // ❗ allow only if checker approved
+//        if ($row['checker_status'] != 1) return;
+//
+//        if ($action === 'approve') {
+//
+//            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+//                SET admin_status = 1,
+//                    final_status = 'approved',
+//                    current_stage = 'completed',
+//                    updated_at = NOW()
+//                WHERE id = $id");
+//        }
+//
+//        if ($action === 'admin_reject') {
+//
+//            $remark = mysqli_real_escape_string($db, $post['admin_remark'] ?? '');
+//
+//            mysqli_query($db, "UPDATE ncd_cooperatives_validation
+//                SET admin_status = 2,
+//                    admin_remark = '$remark',
+//                    final_status = 'rejected',
+//                    current_stage = 'completed',
+//                    updated_at = NOW()
+//                WHERE id = $id");
+//
+//            // NEW REQUEST
+//            mysqli_query($db, "INSERT INTO ncd_cooperatives_validation (
+//                ncd_cooperative_id,
+//                request_id,
+//                maker_status,
+//                checker_status,
+//                admin_status,
+//                current_stage,
+//                final_status
+//            ) VALUES (
+//                $cooperative_id,
+//                $next_request,
+//                0,
+//                0,
+//                0,
+//                'maker',
+//                'in_progress'
+//            )");
+//        }
+//    }
+//}

@@ -1,12 +1,16 @@
 <?php
-session_start();
+// session_start();
 include("../scripts/settings.php");
-
+echo '<base href="../">';
+page_header_start();
+page_header_end();
+page_sidebar();
+// error_reporting(E_ALL);
+// ini_set("display_errors", 1);
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($id <= 0) die("Invalid ID");
 
 $sessionUserType = isset($_SESSION['user_type']) ? $_SESSION['user_type'] : '';
-
 
 $res = execute_query("SELECT * FROM ncd_cooperative_registrations WHERE id = $id");
 
@@ -51,7 +55,7 @@ $fieldConfig = [
     'area_of_operation_id' => [
         'type' => 'select',
         'source' => 'db',
-        'table' => 'area_of_operations_master',
+        'table' => 'ncd_area_of_operations',
         'value' => 'id',
         'label' => 'name'
     ],
@@ -155,15 +159,15 @@ $fieldConfig = [
         'type' => 'select',
         'source' => 'db',
         'table' => 'ncd_urban_local_bodies',
-        'value' => 'localbody_type_code',   // ✅ FIXED
-        'label' => 'localbody_type_name'    // ✅ CORRECT
+        'value' => 'localbody_type_code',
+        'label' => 'localbody_type_name'
     ],
     'urban_local_body_code' => [
         'type' => 'select',
         'source' => 'db',
         'table' => 'ncd_urban_local_bodies',
-        'value' => 'localbody_code',   // ✅ FIXED
-        'label' => 'local_body_name'    // ✅ CORRECT
+        'value' => 'localbody_code',
+        'label' => 'local_body_name'
     ],
     'bank_type' => [
         'type' => 'select',
@@ -369,242 +373,345 @@ $checkerRemark = $lastRejected['checker_remark'] ?? null;
 $adminRemark   = $lastRejected['admin_remark'] ?? null;
 
 $isReadOnlyUser = in_array($sessionUserType, ['ncd_checker', 'ncd_admin']);
+
+
+function getValidationHistoryPair($cooperative_id)
+{
+    // STEP 1: Get latest request_id
+    $latestSql = "
+        SELECT MAX(request_id) AS latest_request_id
+        FROM ncd_cooperatives_validation
+        WHERE ncd_cooperative_id = '$cooperative_id'
+    ";
+
+    $latestRes = execute_query($latestSql);
+    $latestRow = mysqli_fetch_assoc($latestRes);
+
+    $latestRequestId = (int)$latestRow['latest_request_id'];
+
+    // Previous request id
+    $previousRequestId = $latestRequestId - 1;
+
+    // STEP 2: Fetch both latest and previous request data
+    $sql = "
+        SELECT *
+        FROM ncd_cooperatives_validation
+        WHERE ncd_cooperative_id = '$cooperative_id'
+        AND request_id IN ('$latestRequestId', '$previousRequestId')
+        ORDER BY request_id DESC
+    ";
+
+    $res = execute_query($sql);
+
+    $data = [
+        'latest'  => [],
+        'previous' => []
+    ];
+
+    while ($row = mysqli_fetch_assoc($res)) {
+
+        if ((int)$row['request_id'] === $latestRequestId) {
+            $data['latest'] = $row;
+        }
+
+        if ((int)$row['request_id'] === $previousRequestId) {
+            $data['previous'] = $row;
+        }
+    }
+
+    return $data;
+}
+
+$validationData = getValidationHistoryPair($id);
+
+$latestValidation  = $validationData['latest'];
+$previousValidation = $validationData['previous'];
+?>
+<?php
+$workflowStatus = "Not Initiated";
+
+if (empty($latestValidation)) {
+
+    $workflowStatus = "Not Initiated";
+}
+else {
+
+    // =========================
+    // APPROVED
+    // =========================
+    if ($latestValidation['final_status'] == 'approved') {
+
+        $workflowStatus = "Approved";
+    }
+
+    // =========================
+    // REJECTED BY CHECKER
+    // =========================
+    elseif (
+        !empty($previousValidation)
+        &&
+        $previousValidation['checker_status'] == 2
+        &&
+        $latestValidation['current_stage'] == 'maker'
+    ) {
+
+        $workflowStatus = "Rejected By Checker";
+    }
+
+    // =========================
+    // REJECTED BY ADMIN
+    // =========================
+    elseif (
+        !empty($previousValidation)
+        &&
+        $previousValidation['admin_status'] == 2
+        &&
+        $latestValidation['current_stage'] == 'checker'
+    ) {
+
+        $workflowStatus = "Rejected By Admin";
+    }
+
+    // =========================
+    // AT MAKER LEVEL
+    // =========================
+    elseif ($latestValidation['current_stage'] == 'maker') {
+
+        $workflowStatus = "At Maker Level";
+    }
+
+    // =========================
+    // AT CHECKER LEVEL
+    // =========================
+    elseif ($latestValidation['current_stage'] == 'checker') {
+
+        $workflowStatus = "At Checker Level";
+    }
+
+    // =========================
+    // AT ADMIN LEVEL
+    // =========================
+    elseif ($latestValidation['current_stage'] == 'admin') {
+
+        $workflowStatus = "At Admin Level";
+    }
+}
+
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Cooperative Details</title>
-    <meta charset="UTF-8">
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Cooperative Details</title>
+        <meta charset="UTF-8">
 
-    <style>
-        * { box-sizing: border-box; }
+        <style>
+            * { box-sizing: border-box; }
 
-        body {
-            font-family: Arial;
-            background: #eaf0f6;
-            margin: 0;
-        }
+            body {
+                font-family: Arial;
+                background: #eaf0f6;
+                margin: 0;
+            }
 
-        .top-bar {
-            background: linear-gradient(90deg, #e05a00, #f47b20);
-            color: #fff;
-            padding: 10px 20px;
-            font-size: 13px;
-        }
+            .top-bar {
+                background: linear-gradient(90deg, #e05a00, #f47b20);
+                color: #fff;
+                padding: 10px 20px;
+                font-size: 13px;
+            }
 
-        .brand-bar {
-            background: #fff;
-            border-bottom: 2px solid #1a5276;
-            padding: 15px;
-            text-align: center;
-        }
+            .brand-bar {
+                background: #fff;
+                border-bottom: 2px solid #1a5276;
+                padding: 15px;
+                text-align: center;
+            }
 
-        .brand-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #1a5276;
-        }
+            .brand-title {
+                font-size: 28px;
+                font-weight: bold;
+                color: #1a5276;
+            }
 
-        .container { padding: 20px; }
+            .container { padding: 20px; }
 
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
+            .card {
+                background: #fff;
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            }
 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
+            .header {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 20px;
+            }
 
-        .title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #1a5276;
-        }
+            .title {
+                font-size: 18px;
+                font-weight: bold;
+                color: #1a5276;
+            }
 
-        .back-btn {
-            background: #6c757d;
-            color: #fff;
-            padding: 6px 12px;
-            border-radius: 5px;
-            text-decoration: none;
-        }
+            .back-btn {
+                background: #6c757d;
+                color: #fff;
+                padding: 6px 12px;
+                border-radius: 5px;
+                text-decoration: none;
+            }
 
-        .society-title {
-            font-size: 20px;
-            font-weight: bold;
-            color: #1a5276;
-            margin-bottom: 20px;
-            padding: 12px;
-            background: #f1f5f9;
-            border-left: 5px solid #1a5276;
-        }
+            .society-title {
+                font-size: 20px;
+                font-weight: bold;
+                color: #1a5276;
+                margin-bottom: 20px;
+                padding: 12px;
+                background: #f1f5f9;
+                border-left: 5px solid #1a5276;
+            }
 
-        .section { margin-bottom: 25px; }
+            .section { margin-bottom: 25px; }
 
-        .section-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #fff;
-            padding: 8px 12px;
-            background: linear-gradient(135deg, #1a5276, #2c3e50);
-            border-radius: 6px;
-            margin-bottom: 15px;
-        }
+            .section-title {
+                font-size: 14px;
+                font-weight: bold;
+                color: #fff;
+                padding: 8px 12px;
+                background: linear-gradient(135deg, #1a5276, #2c3e50);
+                border-radius: 6px;
+                margin-bottom: 15px;
+            }
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 16px;
-        }
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                gap: 16px;
+            }
 
-        .form-group {
-            background: #f9fafb;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-        }
+            .form-group {
+                background: #f9fafb;
+                padding: 12px;
+                border-radius: 8px;
+                border: 1px solid #e5e7eb;
+            }
 
-        label {
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 6px;
-            display: block;
-        }
+            label {
+                font-size: 12px;
+                font-weight: 600;
+                margin-bottom: 6px;
+                display: block;
+            }
 
-        input, select, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 2px solid #e2e8f0;
-            border-radius: 6px;
-            font-size: 13px;
-        }
+            input, select, textarea {
+                width: 100%;
+                padding: 8px;
+                border: 2px solid #e2e8f0;
+                border-radius: 6px;
+                font-size: 13px;
+            }
 
-        textarea {
-            resize: vertical;
-        }
+            textarea {
+                resize: vertical;
+            }
 
-        input[readonly] {
-            background: #f3f4f6;
-        }
+            input[readonly] {
+                background: #f3f4f6;
+            }
 
-        .actions {
-            margin-top: 25px;
-            text-align: center;
-        }
+            .actions {
+                margin-top: 25px;
+                text-align: center;
+            }
 
-        .btn {
-            padding: 10px 25px;
-            border: none;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #1a5276, #2c3e50);
-            color: #fff;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .top-bar {
-            background: linear-gradient(90deg, #e05a00, #f47b20);
-            color: white;
-            padding: 10px 20px;
-            font-size: 13px;
-            font-weight: 500;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+            .btn {
+                padding: 10px 25px;
+                border: none;
+                border-radius: 8px;
+                background: linear-gradient(135deg, #1a5276, #2c3e50);
+                color: #fff;
+                font-weight: bold;
+                cursor: pointer;
+            }
+            .top-bar {
+                background: linear-gradient(90deg, #e05a00, #f47b20);
+                color: white;
+                padding: 10px 20px;
+                font-size: 13px;
+                font-weight: 500;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
 
-        .brand-bar {
-            background: #ffffff;
-            border-bottom: 2px solid #1a5276;
-            padding: 14px 20px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
+            .brand-bar {
+                background: #ffffff;
+                border-bottom: 2px solid #1a5276;
+                padding: 14px 20px;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+            }
 
-        .brand-logos {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
+            .brand-logos {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
 
-        .logo-circle {
-            width: 54px;
-            height: 54px;
-            border-radius: 50%;
-            border: 2px solid #1a5276;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 8px;
-            font-weight: 500;
-            color: #1a5276;
-            text-align: center;
-            line-height: 1.3;
-        }
+            .logo-circle {
+                width: 54px;
+                height: 54px;
+                border-radius: 50%;
+                border: 2px solid #1a5276;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 8px;
+                font-weight: 500;
+                color: #1a5276;
+                text-align: center;
+                line-height: 1.3;
+            }
 
-        .brand-title {
-            flex: 1;
-            text-align: center;
-        }
+            .brand-title {
+                flex: 1;
+                text-align: center;
+            }
 
-        .brand-title .hindi {
-            font-size: 20px;
-            font-weight: bold;
-            color: #c0392b;
-        }
+            .brand-title .hindi {
+                font-size: 20px;
+                font-weight: bold;
+                color: #c0392b;
+            }
 
-        .brand-title .english {
-            font-size: 17px;
-            font-weight: bold;
-            color: #1a5276;
-        }
-
-        .nav {
-            background: #1a5276;
-            display: flex;
-            padding: 0 16px;
-            padding: 10px 18px;
-            align-items: center;
-        }
+            .brand-title .english {
+                font-size: 17px;
+                font-weight: bold;
+                color: #1a5276;
+            }
 
 
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .save-reject_btn{
+                text-align: center;
+            }
+            @media (min-width: 1200px) {
+                .container, .container-lg, .container-md, .container-sm, .container-xl {
+                    max-width: 1340px;
+                }
+            }
 
-        .nav a:hover,
-        .nav a.active {
-            background: #154360;
-        }
+        </style>
+    </head>
 
-        .nav .login-btn {
-            background: #e74c3c;
-            border-radius: 4px;
-            margin: 6px 0 6px 8px;
-            padding: 5px 16px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .nav .login-btn:hover {
-            background: #c0392b;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .save-reject_btn{
-            text-align: center;
-        }
-    </style>
-</head>
-
-<body>
-<div id="pageLoader" style="
+    <body>
+    <div id="pageLoader" style="
     display:none;
     position:fixed;
     top:0;
@@ -616,7 +723,7 @@ $isReadOnlyUser = in_array($sessionUserType, ['ncd_checker', 'ncd_admin']);
     align-items:center;
     justify-content:center;
 ">
-    <div style="
+        <div style="
         width:50px;
         height:50px;
         border:5px solid #ccc;
@@ -624,8 +731,8 @@ $isReadOnlyUser = in_array($sessionUserType, ['ncd_checker', 'ncd_admin']);
         border-radius:50%;
         animation:spin 1s linear infinite;
     "></div>
-</div>
-<div id="msgBox" style="
+    </div>
+    <div id="msgBox" style="
     display:none;
     position:fixed;
     top:10px;
@@ -637,666 +744,871 @@ $isReadOnlyUser = in_array($sessionUserType, ['ncd_checker', 'ncd_admin']);
     z-index:9999;
     color:#fff;
 ">
-</div>
-
-<!-- Top Bar -->
-<div class="top-bar">
-    <span>UTTAR PRADESH COOPERATIVE DATABASE CENTER (UPCDC)</span>
-    <span>English ▾</span>
-</div>
-
-<!-- Brand Bar -->
-<div class="brand-bar">
-    <div class="brand-logos">
-        <div class="logo-circle" style="background:#f5f0ff; border-color:#7c3aed; color:#5b21b6;">   <a href="https://cooperatives.gov.in/" target="_blank" class="site_logo" rel="home">
-
-                <img id="logo" class="emblem" src="img/coop_logo.png" alt=""
-
-                     style="width: 75px;height: 74px;">
-
-            </a></div>
-
     </div>
-    <div class="brand-title">
-        <div class="hindi">उत्तर प्रदेश को-आपरेटिव डेटाबेस सेंटर</div>
-        <div class="english">Uttar Pradesh Cooperative Database Center</div>
+
+    <div class="brand-bar">
+        <div class="brand-title">Cooperative Society Details</div>
     </div>
-    <div style="text-align:center; font-size:11px; color:#1a5276; font-weight:500; line-height:1.5;">
-        <div class="logo-circle" style="background:#fff0f0; border-color:#c0392b; color:#7b1818;">   <a href="https://cooperatives.gov.in/" target="_blank" class="site_logo" rel="home">
 
-                <img id="logo" class="emblem" src="img/up_logo1.jpeg" alt=""
+    <div class="container">
+        <div class="status-and-remark">
+            <div id="workflowStatusBox"></div>
+            <?php if (
+                ($sessionUserType === 'ncd_maker' || $sessionUserType === 'ncd_checker')
+                &&
+                $workflowStatus !== 'Approved'
+            ) { ?>            <div class="card" style="margin-bottom: 10px">
 
-                     style="width: 75px;height: 74px;">
+                <?php if (!empty($checkerRemark) || !empty($adminRemark)) { ?>
 
-            </a>
-        </div>
-    </div>
-</div>
-
-<!-- Navigation -->
-<nav class="nav">
-
-</nav>
-
-<div class="brand-bar">
-    <div class="brand-title">Cooperative Details</div>
-</div>
-
-<div class="container">
-    <div class="card" style="margin-bottom: 10px">
-        <?php if ($sessionUserType === 'ncd_maker' || $sessionUserType === 'ncd_checker') { ?>
-
-            <?php if (!empty($checkerRemark) || !empty($adminRemark)) { ?>
-
-                <div style="
+                    <div style="
             background:#fff3cd;
             border-left:5px solid #f39c12;
             padding:12px;
             margin-bottom:15px;
             border-radius:6px;
         ">
-                    <strong>⚠ Review Remarks:</strong><br><br>
+                        <strong>⚠ Review Remarks:</strong><br><br>
 
-                    <?php if ($sessionUserType === 'ncd_maker' && !empty($checkerRemark)) { ?>
-                        <div style="margin-bottom:6px;">
-                            <strong>Checker:</strong> <?= htmlspecialchars($checkerRemark) ?>
-                        </div>
-                    <?php } ?>
+                        <?php if ($sessionUserType === 'ncd_maker' && !empty($checkerRemark)) { ?>
+                            <div style="margin-bottom:6px;">
+                                <strong>Checker:</strong> <?= htmlspecialchars($checkerRemark) ?>
+                            </div>
+                        <?php } ?>
 
-                    <?php if (!empty($adminRemark)) { ?>
-                        <div>
-                            <strong>Admin:</strong> <?= htmlspecialchars($adminRemark) ?>
-                        </div>
-                    <?php } ?>
+                        <?php if (!empty($adminRemark)) { ?>
+                            <div>
+                                <strong>Admin:</strong> <?= htmlspecialchars($adminRemark) ?>
+                            </div>
+                        <?php } ?>
 
-                </div>
+                    </div>
 
-            <?php } ?>
-
+                <?php } ?>
+            </div>
         <?php } ?>
-    </div>
-    <div class="card">
-        <div class="header">
-            <div class="title">Cooperative Information</div>
-            <a href="javascript:history.back()" class="back-btn">← Back</a>
         </div>
 
-        <form id="coopForm">
-            <input type="hidden" name="id" value="<?= $id ?>">
-            <?php $user_type = isset($_SESSION['user_type']) ? $_SESSION['user_type'] : ''; ?>
+        <div class="card">
+            <div class="header">
+                <div class="title">Cooperative Information</div>
+                <a href="#" class="back-btn" onclick="goBack()">← Back</a>
 
-            <!-- SOCIETY NAME -->
-            <div class="society-title">
-                Society Name: <?= e($societyName) ?>
-            </div>
+                <script>
+                    function goBack() {
+                        if (document.referrer !== "") {
+                            window.history.back();
+                        } else {
+                            window.location.href = "list_page.php";
+                        }
+                    }
+                </script>        </div>
 
-            <!--  BASIC -->
-            <div class="section">
-                <div class="section-title">Basic Information</div>
-                <div class="grid">
+            <form id="coopForm">
+                <input type="hidden" name="id" value="<?= $id ?>">
+                <?php $user_type = isset($_SESSION['user_type']) ? $_SESSION['user_type'] : ''; ?>
 
-                    <?php foreach($basicFields as $col):
-                        if(!isset($row[$col])) continue;
-                        $val = $row[$col];
-                        $config = $fieldConfig[$col] ?? null;
-                        ?>
+                <!-- SOCIETY NAME -->
+                <div class="society-title">
+                    Society Name: <?= e($societyName) ?>
+                </div>
 
-                        <div class="form-group">
-                            <label><?= getLabel($col) ?></label>
+                <!--  BASIC -->
+                <div class="section">
+                    <div class="section-title">Basic Information</div>
+                    <div class="grid">
 
-                            <?php
-                            if ($config && $config['type'] === 'textarea') {
-                                echo "<textarea name='$col'>".e($val)."</textarea>";
-                            }
-                            elseif ($config && $config['type'] === 'select') {
+                        <?php foreach($basicFields as $col):
+                            if(!isset($row[$col])) continue;
+                            $val = $row[$col];
+                            $config = $fieldConfig[$col] ?? null;
+                            ?>
 
-                                //Skip options for dynamic dropdowns
-                                if ($config['source'] === 'dynamic') {
-                                    echo "<select name='$col' id='$col'>";
-                                    echo "<option value=''>-- Select --</option>";
-                                    echo "</select>";
+                            <div class="form-group">
+                                <label><?= getLabel($col) ?></label>
+
+                                <?php
+                                if ($config && $config['type'] === 'textarea') {
+                                    echo "<textarea name='$col'>".e($val)."</textarea>";
                                 }
+                                elseif ($config && $config['type'] === 'select') {
 
-                                elseif ($config['source'] === 'db') {
-                                    $options = getOptionsFromDB($config['table'], $config['value'], $config['label']);
-
-                                    echo "<select name='$col' id='$col'>";
-                                    echo "<option value=''>-- Select --</option>";
-
-                                    foreach($options as $k => $v){
-                                        $sel = ((string)$k === (string)$val) ? "selected" : "";
-                                        echo "<option value='".e(trim($k))."' $sel>".e(trim($v))."</option>";
+                                    //Skip options for dynamic dropdowns
+                                    if ($config['source'] === 'dynamic') {
+                                        echo "<select name='$col' id='$col'>";
+                                        echo "<option value=''>-- Select --</option>";
+                                        echo "</select>";
                                     }
 
-                                    echo "</select>";
+                                    elseif ($config['source'] === 'db') {
+                                        $options = getOptionsFromDB($config['table'], $config['value'], $config['label']);
+
+                                        echo "<select name='$col' id='$col'>";
+                                        echo "<option value=''>-- Select --</option>";
+
+                                        foreach($options as $k => $v){
+                                            $sel = ((string)$k === (string)$val) ? "selected" : "";
+                                            echo "<option value='".e(trim($k))."' $sel>".e(trim($v))."</option>";
+                                        }
+
+                                        echo "</select>";
+                                    }
+
+                                    else {
+                                        $options = $config['options'];
+
+                                        echo "<select name='$col' id='$col'>";
+                                        echo "<option value=''>-- Select --</option>";
+
+                                        foreach($options as $k => $v){
+                                            $sel = ((string)$k === (string)$val) ? "selected" : "";
+                                            echo "<option value='".e(trim($k))."' $sel>".e(trim($v))."</option>";
+                                        }
+
+                                        echo "</select>";
+                                    }
+                                }
+                                elseif ($config && !empty($config['readonly'])) {
+                                    echo "<input type='text' value='".e($val)."' readonly>";
                                 }
 
                                 else {
-                                    $options = $config['options'];
-
-                                    echo "<select name='$col' id='$col'>";
-                                    echo "<option value=''>-- Select --</option>";
-
-                                    foreach($options as $k => $v){
-                                        $sel = ((string)$k === (string)$val) ? "selected" : "";
-                                        echo "<option value='".e(trim($k))."' $sel>".e(trim($v))."</option>";
-                                    }
-
-                                    echo "</select>";
+                                    echo "<input type='text' name='$col' value='".e($val)."'>";
                                 }
-                            }
-                            elseif ($config && !empty($config['readonly'])) {
-                                echo "<input type='text' value='".e($val)."' readonly>";
-                            }
+                                ?>
 
-                            else {
-                                echo "<input type='text' name='$col' value='".e($val)."'>";
-                            }
-                            ?>
-
-                        </div>
-
-                    <?php endforeach; ?>
-
-                </div>
-            </div>
-
-            <!-- ADDITIONAL -->
-            <div class="section">
-                <div class="section-title">Other Details</div>
-                <div class="grid">
-
-                    <?php foreach($row as $col => $val):
-
-                        if($col == 'id' || $col == 'cooperative_society_name') continue;
-                        if(in_array($col, $basicFields)) continue;
-
-                        $config = $fieldConfig[$col] ?? null;
-                        ?>
-
-                        <div class="form-group">
-                            <label><?= getLabel($col) ?></label>
-
-                            <?php
-                            if ($config && $config['type'] === 'textarea') {
-                                echo "<textarea name='$col'>".e($val)."</textarea>";
-                            }
-                            elseif ($config && $config['type'] === 'select') {
-
-                                //  Skip options for dynamic dropdowns
-                                if ($config['source'] === 'dynamic') {
-                                    echo "<select name='$col' id='$col'>";
-                                    echo "<option value=''>-- Select --</option>";
-                                    echo "</select>";
-                                }
-
-                                elseif ($config['source'] === 'db') {
-                                    $options = getOptionsFromDB($config['table'], $config['value'], $config['label']);
-
-                                    echo "<select name='$col' id='$col'>";
-                                    echo "<option value=''>-- Select --</option>";
-
-                                    foreach($options as $k => $v){
-                                        $sel = ((string)$k === (string)$val) ? "selected" : "";
-                                        echo "<option value='".e(trim($k))."' $sel>".e(trim($v))."</option>";
-                                    }
-
-                                    echo "</select>";
-                                }
-
-                                else {
-                                    $options = $config['options'];
-
-                                    echo "<select name='$col' id='$col'>";
-                                    echo "<option value=''>-- Select --</option>";
-
-                                    foreach($options as $k => $v){
-                                        $sel = ((string)$k === (string)$val) ? "selected" : "";
-                                        echo "<option value='".e(trim($k))."' $sel>".e(trim($v))."</option>";
-                                    }
-
-                                    echo "</select>";
-                                }
-                            }
-                            else {
-                                echo "<input type='text' name='$col' value='".e($val)."'>";
-                            }
-                            ?>
-
-                        </div>
-
-                    <?php endforeach; ?>
-
-                </div>
-            </div>
-
-            <?php if ($sessionUserType === 'ncd_maker') { ?>
-                <div class="actions">
-
-                    <!-- SAVE (Draft) -->
-                    <button type="submit" name="action" value="save" class="btn">
-                        Save Draft
-                    </button>
-
-                    <!-- FINAL SUBMIT -->
-                    <button type="submit" name="action" value="submit" class="btn" style="background:green">
-                        Submit to Checker
-                    </button>
-
-                </div>
-            <?php } ?>
-
-            <div>
-                <?php if ($sessionUserType === 'ncd_checker') { ?>
-                    <div class="save-reject_btn">
-                        <button type="submit" name="action" value="verify" class="btn" style="background:green">
-                            Verify
-                        </button>
-
-                        <button type="button" class="btn" style="background:red" onclick="toggleCheckerReject()">
-                            Reject
-                        </button>
-                    </div>
-                    <div >
-                        <div id="checkerRejectBox" style="display:none; margin:10px;padding: 10px;">
-                            <textarea name="checker_remark" placeholder="Enter rejection reason" required></textarea>
-                            <div class="save-reject_btn " style="margin: 10px">
-                                <button type="submit" name="action" value="checker_reject" class="btn ">
-                                    Final Reject
-                                </button>
                             </div>
 
-                        </div>
-                    </div>
+                        <?php endforeach; ?>
 
-                <?php } ?>
-            </div>
-            <div>
-                <?php if ($sessionUserType === 'ncd_admin') { ?>
-                <div class="save-reject_btn">
-                    <button type="submit" name="action" value="approve" class="btn" style="background:green">
-                        Approve
-                    </button>
-
-                    <button type="button" class="btn" style="background:red" onclick="toggleAdminReject()">
-                        Reject
-                    </button>
-
-                    <div id="adminRejectBox" style="display:none; margin-top:10px;">
-                        <textarea name="admin_remark" placeholder="Enter rejection reason" required></textarea>
-                        <button type="submit" name="action" value="admin_reject" class="btn">
-                            Final Reject
-                        </button>
                     </div>
                 </div>
 
-                <?php } ?>
-            </div>
+                <!-- ADDITIONAL -->
+                <div class="section">
+                    <div class="section-title">Other Details</div>
+                    <div class="grid">
 
-        </form>
+                        <?php foreach($row as $col => $val):
 
+                            if($col == 'id' || $col == 'cooperative_society_name') continue;
+                            if(in_array($col, $basicFields)) continue;
+
+                            $config = $fieldConfig[$col] ?? null;
+                            ?>
+
+                            <div class="form-group">
+                                <label><?= getLabel($col) ?></label>
+
+                                <?php
+                                if ($config && $config['type'] === 'textarea') {
+                                    echo "<textarea name='$col'>".e($val)."</textarea>";
+                                }
+                                elseif ($config && $config['type'] === 'select') {
+
+                                    //  Skip options for dynamic dropdowns
+                                    if ($config['source'] === 'dynamic') {
+                                        echo "<select name='$col' id='$col'>";
+                                        echo "<option value=''>-- Select --</option>";
+                                        echo "</select>";
+                                    }
+
+                                    elseif ($config['source'] === 'db') {
+                                        $options = getOptionsFromDB($config['table'], $config['value'], $config['label']);
+
+                                        echo "<select name='$col' id='$col'>";
+                                        echo "<option value=''>-- Select --</option>";
+
+                                        foreach($options as $k => $v){
+                                            $sel = ((string)$k === (string)$val) ? "selected" : "";
+                                            echo "<option value='".e(trim($k))."' $sel>".e(trim($v))."</option>";
+                                        }
+
+                                        echo "</select>";
+                                    }
+
+                                    else {
+                                        $options = $config['options'];
+
+                                        echo "<select name='$col' id='$col'>";
+                                        echo "<option value=''>-- Select --</option>";
+
+                                        foreach($options as $k => $v){
+                                            $sel = ((string)$k === (string)$val) ? "selected" : "";
+                                            echo "<option value='".e(trim($k))."' $sel>".e(trim($v))."</option>";
+                                        }
+
+                                        echo "</select>";
+                                    }
+                                }
+                                else {
+                                    echo "<input type='text' name='$col' value='".e($val)."'>";
+                                }
+                                ?>
+
+                            </div>
+
+                        <?php endforeach; ?>
+
+                    </div>
+                </div>
+
+                 <div class="btn-box-action">
+                    <?php if ($sessionUserType === 'ncd_maker') { ?>
+                        <div class="actions">
+
+                            <!-- SAVE (Draft) -->
+                            <button type="submit" name="action" value="save" class="btn">
+                                Save Draft
+                            </button>
+
+                            <!-- FINAL SUBMIT -->
+                            <button type="submit" name="action" value="submit" class="btn" style="background:green">
+                                Submit to Checker
+                            </button>
+
+                        </div>
+                    <?php } ?>
+
+                    <div>
+                        <?php if ($sessionUserType === 'ncd_checker') { ?>
+                            <div class="save-reject_btn">
+                                <button type="submit" name="action" value="verify" class="btn" style="background:green">
+                                    Verify
+                                </button>
+
+                                <button type="button" class="btn" style="background:red" onclick="toggleCheckerReject()">
+                                    Reject
+                                </button>
+                            </div>
+                            <div >
+                                <div id="checkerRejectBox" style="display:none; margin:10px;padding: 10px;">
+                                    <textarea name="checker_remark" placeholder="Enter rejection reason" required></textarea>
+                                    <div class="save-reject_btn " style="margin: 10px">
+                                        <button type="submit" name="action" value="checker_reject" class="btn ">
+                                            Final Reject
+                                        </button>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                        <?php } ?>
+                    </div>
+                    <div>
+                        <?php if ($sessionUserType === 'ncd_admin') { ?>
+                            <div class="save-reject_btn">
+                                <button type="submit" name="action" value="approve" class="btn" style="background:green">
+                                    Approve
+                                </button>
+
+                                <button type="button" class="btn" style="background:red" onclick="toggleAdminReject()">
+                                    Reject
+                                </button>
+
+                                <div id="adminRejectBox" style="display:none; margin-top:10px;">
+                                    <textarea name="admin_remark" placeholder="Enter rejection reason" required></textarea>
+                                    <button type="submit" name="action" value="admin_reject" class="btn">
+                                        Final Reject
+                                    </button>
+                                </div>
+                            </div>
+
+                        <?php } ?>
+                    </div>
+
+                 </div>
+
+            </form>
+
+        </div>
     </div>
-</div>
 
-</body>
-</html>
+    </body>
+    </html>
 
-<script>
+    <script>
 
-    //  PRESELECT DATA FROM PHP
-    const preselected = {
-        state: "<?= $row['state_code'] ?? '' ?>",
-        district: "<?= $row['district_code'] ?? '' ?>",
-        block: "<?= $row['block_code'] ?? '' ?>",
-        gp: "<?= $row['gram_panchayat_code'] ?? '' ?>",
-        village: "<?= $row['village_code'] ?? '' ?>"
-    };
+        //  PRESELECT DATA FROM PHP
+        const preselected = {
+            state: "<?= $row['state_code'] ?? '' ?>",
+            district: "<?= $row['district_code'] ?? '' ?>",
+            block: "<?= $row['block_code'] ?? '' ?>",
+            gp: "<?= $row['gram_panchayat_code'] ?? '' ?>",
+            village: "<?= $row['village_code'] ?? '' ?>"
+        };
 
 
-    //  ELEMENT REFERENCES
-    const state    = document.querySelector("[name='state_code']");
-    const district = document.querySelector("[name='district_code']");
-    const block    = document.querySelector("[name='block_code']");
-    const gp       = document.querySelector("[name='gram_panchayat_code']");
-    const village  = document.querySelector("[name='village_code']");
+        //  ELEMENT REFERENCES
+        const state    = document.querySelector("[name='state_code']");
+        const district = document.querySelector("[name='district_code']");
+        const block    = document.querySelector("[name='block_code']");
+        const gp       = document.querySelector("[name='gram_panchayat_code']");
+        const village  = document.querySelector("[name='village_code']");
 
-    //  GENERIC DROPDOWN LOADER
-    function loadDropdown(url, target, valueKey, labelKey, selectedValue = '') {
+        //  GENERIC DROPDOWN LOADER
+        function loadDropdown(url, target, valueKey, labelKey, selectedValue = '') {
 
-        // Reset target before loading
-        target.innerHTML = "<option value=''>Loading...</option>";
+            // Reset target before loading
+            target.innerHTML = "<option value=''>Loading...</option>";
 
-        return fetch(url)
-            .then(res => res.json())
-    .then(data => {
+            return fetch(url)
+                .then(res => res.json())
+        .then(data => {
 
-            let html = "<option value=''>-- Select --</option>";
+                let html = "<option value=''>-- Select --</option>";
 
-        if (!data || data.length === 0) {
-            target.innerHTML = "<option value=''>No Data Found</option>";
-            return;
+            if (!data || data.length === 0) {
+                target.innerHTML = "<option value=''>No Data Found</option>";
+                return;
+            }
+
+            data.forEach(item => {
+                let selected = (String(item[valueKey]) === String(selectedValue)) ? "selected" : "";
+            html += `<option value="${item[valueKey]}" ${selected}>${item[labelKey]}</option>`;
+        });
+
+            target.innerHTML = html;
+        })
+        .catch(err => {
+                console.error("Dropdown Load Error:", err);
+            target.innerHTML = "<option value=''>Error loading</option>";
+        });
         }
 
-        data.forEach(item => {
-            let selected = (String(item[valueKey]) === String(selectedValue)) ? "selected" : "";
-        html += `<option value="${item[valueKey]}" ${selected}>${item[labelKey]}</option>`;
-    });
-
-        target.innerHTML = html;
-    })
-    .catch(err => {
-            console.error("Dropdown Load Error:", err);
-        target.innerHTML = "<option value=''>Error loading</option>";
-    });
-    }
-
-    //  RESET HELPERS
-    function resetDropdown(el) {
-        el.innerHTML = "<option value=''>-- Select --</option>";
-    }
-
-    function resetBelow(level) {
-        if (level === 'state') {
-            resetDropdown(district);
-            resetDropdown(block);
-            resetDropdown(gp);
-            resetDropdown(village);
+        //  RESET HELPERS
+        function resetDropdown(el) {
+            el.innerHTML = "<option value=''>-- Select --</option>";
         }
-        if (level === 'district') {
-            resetDropdown(block);
-            resetDropdown(gp);
-            resetDropdown(village);
+
+        function resetBelow(level) {
+            if (level === 'state') {
+                resetDropdown(district);
+                resetDropdown(block);
+                resetDropdown(gp);
+                resetDropdown(village);
+            }
+            if (level === 'district') {
+                resetDropdown(block);
+                resetDropdown(gp);
+                resetDropdown(village);
+            }
+            if (level === 'block') {
+                resetDropdown(gp);
+                resetDropdown(village);
+            }
+            if (level === 'gp') {
+                resetDropdown(village);
+            }
         }
-        if (level === 'block') {
-            resetDropdown(gp);
-            resetDropdown(village);
-        }
-        if (level === 'gp') {
-            resetDropdown(village);
-        }
-    }
 
-    //  CHANGE EVENTS
-    state.addEventListener("change", async function () {
-        if (!this.value) return resetBelow('state');
+        //  CHANGE EVENTS
+        state.addEventListener("change", async function () {
+            if (!this.value) return resetBelow('state');
 
-        await loadDropdown(
-            "ajax/get_districts.php?state_code=" + this.value,
-            district,
-            "district_code",
-            "district_name"
-        );
-
-        resetBelow('district');
-    });
-
-    district.addEventListener("change", async function () {
-        if (!this.value) return resetBelow('district');
-
-        await loadDropdown(
-            "ajax/get_blocks.php?district_code=" + this.value,
-            block,
-            "block_code",
-            "name"
-        );
-
-        resetBelow('block');
-    });
-
-    block.addEventListener("change", async function () {
-        if (!this.value) return resetBelow('block');
-
-        await loadDropdown(
-            "ajax/get_gp.php?block_code=" + this.value,
-            gp,
-            "gram_panchayat_code",
-            "gram_panchayat_name"
-        );
-
-        resetBelow('gp');
-    });
-
-    gp.addEventListener("change", async function () {
-        if (!this.value) return resetBelow('gp');
-
-        await loadDropdown(
-            "ajax/get_villages.php?gp_code=" + this.value,
-            village,
-            "village_code",
-            "village_name"
-        );
-    });
-
-    // PRESELECT FLOW
-    window.addEventListener("load", async function () {
-
-        if (!preselected.state) return;
-
-        // STEP 1: District
-        await loadDropdown(
-            "ajax/get_districts.php?state_code=" + preselected.state,
-            district,
-            "district_code",
-            "district_name",
-            preselected.district
-        );
-
-        // STEP 2: Block
-        if (preselected.district) {
             await loadDropdown(
-                "ajax/get_blocks.php?district_code=" + preselected.district,
+                "Ncd_Reports/ajax/get_districts.php?state_code=" + this.value,
+                district,
+                "district_code",
+                "district_name"
+            );
+
+            resetBelow('district');
+        });
+
+        district.addEventListener("change", async function () {
+            if (!this.value) return resetBelow('district');
+
+            await loadDropdown(
+                "Ncd_Reports/ajax/get_blocks.php?district_code=" + this.value,
                 block,
                 "block_code",
-                "name",
-                preselected.block
+                "name"
             );
-        }
 
-        // STEP 3: GP
-        if (preselected.block) {
+            resetBelow('block');
+        });
+
+        block.addEventListener("change", async function () {
+            if (!this.value) return resetBelow('block');
+
             await loadDropdown(
-                "ajax/get_gp.php?block_code=" + preselected.block,
+                "Ncd_Reports/ajax/get_gp.php?block_code=" + this.value,
                 gp,
                 "gram_panchayat_code",
-                "gram_panchayat_name",
-                preselected.gp
+                "gram_panchayat_name"
             );
-        }
 
-        // STEP 4: Village
-        if (preselected.gp) {
+            resetBelow('gp');
+        });
+
+        gp.addEventListener("change", async function () {
+            if (!this.value) return resetBelow('gp');
+
             await loadDropdown(
-                "ajax/get_villages.php?gp_code=" + preselected.gp,
+                "Ncd_Reports/ajax/get_villages.php?gp_code=" + this.value,
                 village,
                 "village_code",
-                "village_name",
-                preselected.village
+                "village_name"
             );
-        }
-    });
-
-</script>
-
-<script>
-    const form = document.getElementById("coopForm");
-    const msgBox = document.getElementById("msgBox");
-    const loader = document.getElementById("pageLoader");
-
-    let isSubmitting = false;
-    let clickedButton = null;
-
-    // detect which submit button was clicked
-    document.querySelectorAll("#coopForm button[type=submit]").forEach(btn => {
-        btn.addEventListener("click", function () {
-            clickedButton = this;
         });
-    });
 
-    // MESSAGE FUNCTION
-    function showMessage(message, type = "success") {
+        // PRESELECT FLOW
+        window.addEventListener("load", async function () {
 
-        msgBox.innerText = message;
-        msgBox.style.background = (type === "success") ? "#28a745" : "#dc3545";
+            if (!preselected.state) return;
 
-        msgBox.style.display = "block";
-        msgBox.style.opacity = "1";
+            // STEP 1: District
+            await loadDropdown(
+                "Ncd_Reports/ajax/get_districts.php?state_code=" + preselected.state,
+                district,
+                "district_code",
+                "district_name",
+                preselected.district
+            );
 
-        setTimeout(() => {
-            msgBox.style.opacity = "0";
-        setTimeout(() => {
-            msgBox.style.display = "none";
-    }, 300);
-    }, 3000);
-    }
+            // STEP 2: Block
+            if (preselected.district) {
+                await loadDropdown(
+                    "Ncd_Reports/ajax/get_blocks.php?district_code=" + preselected.district,
+                    block,
+                    "block_code",
+                    "name",
+                    preselected.block
+                );
+            }
 
-    //FORM SUBMIT
-    form.addEventListener("submit", function(e) {
-        e.preventDefault();
+            // STEP 3: GP
+            if (preselected.block) {
+                await loadDropdown(
+                    "Ncd_Reports/ajax/get_gp.php?block_code=" + preselected.block,
+                    gp,
+                    "gram_panchayat_code",
+                    "gram_panchayat_name",
+                    preselected.gp
+                );
+            }
 
-        if (isSubmitting) return;
-        isSubmitting = true;
+            // STEP 4: Village
+            if (preselected.gp) {
+                await loadDropdown(
+                    "Ncd_Reports/ajax/get_villages.php?gp_code=" + preselected.gp,
+                    village,
+                    "village_code",
+                    "village_name",
+                    preselected.village
+                );
+            }
+        });
 
-        const formData = new FormData(this);
+    </script>
 
-        // IMPORTANT: send correct action (save / submit / verify etc.)
-        if (clickedButton) {
-            formData.set("action", clickedButton.value);
+    <script>
+        const form = document.getElementById("coopForm");
+        const msgBox = document.getElementById("msgBox");
+        const loader = document.getElementById("pageLoader");
+
+        let isSubmitting = false;
+        let clickedButton = null;
+
+        // detect which submit button was clicked
+        document.querySelectorAll("#coopForm button[type=submit]").forEach(btn => {
+            btn.addEventListener("click", function () {
+                clickedButton = this;
+            });
+        });
+
+        // MESSAGE FUNCTION
+        function showMessage(message, type = "success") {
+
+            msgBox.innerText = message;
+            msgBox.style.background = (type === "success") ? "#28a745" : "#dc3545";
+
+            msgBox.style.display = "block";
+            msgBox.style.opacity = "1";
+
+            setTimeout(() => {
+                msgBox.style.opacity = "0";
+            setTimeout(() => {
+                msgBox.style.display = "none";
+        }, 300);
+        }, 3000);
         }
 
-        const btn = clickedButton || this.querySelector("button");
+        //FORM SUBMIT
+        form.addEventListener("submit", function(e) {
+            e.preventDefault();
 
-        // UI START
-        loader.style.display = "flex";
-        btn.disabled = true;
-        btn.innerText = "Saving...";
+            if (isSubmitting) return;
+            isSubmitting = true;
 
-        fetch("ajax/save_cooperative.php", {
-            method: "POST",
-            body: formData
+            const formData = new FormData(this);
+
+            // IMPORTANT: send correct action (save / submit / verify etc.)
+            if (clickedButton) {
+                formData.set("action", clickedButton.value);
+            }
+
+            const btn = clickedButton || this.querySelector("button");
+
+            // UI START
+            loader.style.display = "flex";
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
+            fetch("Ncd_Reports/ajax/save_cooperative.php", {
+                method: "POST",
+                body: formData
+            })
+                .then(res => res.text())
+        .then(text => {
+
+                let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error("Invalid JSON:", text);
+                throw new Error("Invalid response from server");
+            }
+
+            loader.style.display = "none";
+
+            setTimeout(() => {
+                if (data.status === "success") {
+                showMessage(data.message || "Saved successfully", "success");
+            } else {
+                showMessage(data.message || "Update failed", "error");
+            }
+        }, 50);
+
         })
-            .then(res => res.text())
-    .then(text => {
+        .catch(err => {
+                console.error(err);
 
-            let data;
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            console.error("Invalid JSON:", text);
-            throw new Error("Invalid response from server");
-        }
+            loader.style.display = "none";
 
-        loader.style.display = "none";
+            setTimeout(() => {
+                showMessage("Server error occurred", "error");
+        }, 50);
+        })
+        .finally(() => {
+                isSubmitting = false;
+            btn.disabled = false;
+            btn.innerText = "Save";
+            clickedButton = null;
+        });
 
-        setTimeout(() => {
-            if (data.status === "success") {
-            showMessage(data.message || "Saved successfully", "success");
-        } else {
-            showMessage(data.message || "Update failed", "error");
-        }
-    }, 50);
+        });
+    </script>
 
-    })
-    .catch(err => {
-            console.error(err);
+    <script>
+        function toggleCheckerReject() {
+            const box = document.getElementById("checkerRejectBox");
+            if (box) {
+                box.style.display = "block";
 
-        loader.style.display = "none";
-
-        setTimeout(() => {
-            showMessage("Server error occurred", "error");
-    }, 50);
-    })
-    .finally(() => {
-            isSubmitting = false;
-        btn.disabled = false;
-        btn.innerText = "Save";
-        clickedButton = null;
-    });
-
-    });
-</script>
-
-<script>
-    function toggleCheckerReject() {
-        const box = document.getElementById("checkerRejectBox");
-        if (box) {
-            box.style.display = "block";
-
-            const textarea = box.querySelector("textarea[name='checker_remark']");
-            if (textarea) {
-                textarea.setAttribute("required", "required");
+                const textarea = box.querySelector("textarea[name='checker_remark']");
+                if (textarea) {
+                    textarea.setAttribute("required", "required");
+                }
             }
         }
-    }
 
-    function toggleAdminReject() {
-        const box = document.getElementById("adminRejectBox");
-        if (box) {
-            box.style.display = "block";
+        function toggleAdminReject() {
+            const box = document.getElementById("adminRejectBox");
+            if (box) {
+                box.style.display = "block";
 
-            const textarea = box.querySelector("textarea[name='admin_remark']");
-            if (textarea) {
-                textarea.setAttribute("required", "required");
+                const textarea = box.querySelector("textarea[name='admin_remark']");
+                if (textarea) {
+                    textarea.setAttribute("required", "required");
+                }
             }
         }
-    }
 
-    document.querySelector("button[value='verify']")?.addEventListener("click", function () {
-        const textarea = document.querySelector("textarea[name='checker_remark']");
-        if (textarea) {
-            textarea.removeAttribute("required");
+        document.querySelector("button[value='verify']")?.addEventListener("click", function () {
+            const textarea = document.querySelector("textarea[name='checker_remark']");
+            if (textarea) {
+                textarea.removeAttribute("required");
+            }
+        });
+
+        document.querySelector("button[value='approve']")?.addEventListener("click", function () {
+            const textarea = document.querySelector("textarea[name='admin_remark']");
+            if (textarea) {
+                textarea.removeAttribute("required");
+            }
+        });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+
+            // 1. USER TYPE FROM PHP
+            const userType = "<?= $sessionUserType ?>";
+            const isReadOnlyUser = (userType === 'ncd_checker' || userType === 'ncd_admin' || userType ==='superadmin');
+
+            if (!isReadOnlyUser) return;
+
+            // 2. LOCK ALL FIELDS EXCEPT REMARKS & BUTTONS
+            document.querySelectorAll("#coopForm input, #coopForm textarea, #coopForm select")
+                .forEach(el => {
+
+                // Allow remarks fields
+                if (el.name === "checker_remark" || el.name === "admin_remark") return;
+
+            // Allow buttons
+            if (el.type === "submit" || el.type === "button") return;
+
+            // Handle SELECT
+            if (el.tagName === "SELECT") {
+                el.disabled = true;
+
+                // create hidden input to preserve value
+                const hidden = document.createElement("input");
+                hidden.type = "hidden";
+                hidden.name = el.name;
+                hidden.value = el.value;
+
+                el.parentNode.appendChild(hidden);
+            }
+
+            // Handle INPUT & TEXTAREA
+            else {
+                if (el.type !== "hidden") {
+                    el.readOnly = true;
+                }
+            }
+
+            // Add visual style
+            el.style.background = "#f1f5f9";
+            el.style.cursor = "not-allowed";
+        });
+
+        });
+    </script>
+
+    <script>
+        function goBack() {
+            if (document.referrer !== "") {
+                history.back();
+            } else {
+                window.location.href = "list_page.php"; // 👈 change to your listing page
+            }
         }
-    });
+    </script>
 
-    document.querySelector("button[value='approve']")?.addEventListener("click", function () {
-        const textarea = document.querySelector("textarea[name='admin_remark']");
-        if (textarea) {
-            textarea.removeAttribute("required");
-        }
-    });
-</script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-
-        // 1. USER TYPE FROM PHP
+    <script>
+        const workflowStatus = "<?= $workflowStatus ?>";
         const userType = "<?= $sessionUserType ?>";
-        const isReadOnlyUser = (userType === 'ncd_checker' || userType === 'ncd_admin');
 
-        if (!isReadOnlyUser) return;
+        document.addEventListener("DOMContentLoaded", function () {
 
-        // 2. LOCK ALL FIELDS EXCEPT REMARKS & BUTTONS
-        document.querySelectorAll("#coopForm input, #coopForm textarea, #coopForm select")
-            .forEach(el => {
+            const statusBox = document.getElementById("workflowStatusBox");
+            const btnSection = document.querySelector(".btn-box-action");
 
-            // Allow remarks fields
-            if (el.name === "checker_remark" || el.name === "admin_remark") return;
+            let bg = "#6c757d";
 
-        // Allow buttons
-        if (el.type === "submit" || el.type === "button") return;
+            // =========================
+            // STATUS COLORS
+            // =========================
 
-        // Handle SELECT
-        if (el.tagName === "SELECT") {
-            el.disabled = true;
-
-            // create hidden input to preserve value
-            const hidden = document.createElement("input");
-            hidden.type = "hidden";
-            hidden.name = el.name;
-            hidden.value = el.value;
-
-            el.parentNode.appendChild(hidden);
-        }
-
-        // Handle INPUT & TEXTAREA
-        else {
-            if (el.type !== "hidden") {
-                el.readOnly = true;
+            if (workflowStatus === "Approved") {
+                bg = "green";
             }
-        }
 
-        // Add visual style
-        el.style.background = "#f1f5f9";
-        el.style.cursor = "not-allowed";
-    });
+            if (
+                workflowStatus === "Rejected By Checker"
+                ||
+                workflowStatus === "Rejected By Admin"
+            ) {
+                bg = "red";
+            }
 
-    });
-</script>
+            if (
+                workflowStatus === "At Checker Level"
+                ||
+                workflowStatus === "At Admin Level"
+            ) {
+                bg = "#f39c12";
+            }
+
+            statusBox.innerHTML =
+                "<span style='font-weight:bold; color:" + bg + ";'>" +
+                "STATUS : " + workflowStatus +
+                "</span>";
+
+            // =========================
+            // BUTTON REFERENCES
+            // =========================
+
+            const makerButtons = document.querySelector(".actions");
+
+            const checkerVerifyBtn =
+                document.querySelector("button[value='verify']");
+
+            const checkerRejectBtn =
+                document.querySelector("button[value='checker_reject']")
+        ?.closest(".save-reject_btn");
+
+            const adminApproveBtn =
+                document.querySelector("button[value='approve']");
+
+            const adminRejectBtn =
+                document.querySelector("button[value='admin_reject']")
+        ?.closest(".save-reject_btn");
+
+            // hide everything first
+
+            if (makerButtons) {
+                makerButtons.style.display = "none";
+            }
+
+            if (checkerVerifyBtn) {
+                checkerVerifyBtn.closest(".save-reject_btn").style.display = "none";
+            }
+
+            if (adminApproveBtn) {
+                adminApproveBtn.closest(".save-reject_btn").style.display = "none";
+            }
+
+            // =========================
+            // APPROVED
+            // nobody sees buttons
+            // =========================
+
+            if (workflowStatus === "Approved") {
+                return;
+            }
+
+            // =========================
+            // NOT INITIATED
+            // maker only
+            // =========================
+
+            if (workflowStatus === "Not Initiated") {
+
+                if (userType === "ncd_maker") {
+
+                    if (makerButtons) {
+                        makerButtons.style.display = "block";
+                    }
+                }
+
+                return;
+            }
+
+            // =========================
+            // REJECTED BY CHECKER
+            // maker only
+            // =========================
+
+            if (workflowStatus === "Rejected By Checker") {
+
+                if (userType === "ncd_maker") {
+
+                    if (makerButtons) {
+                        makerButtons.style.display = "block";
+                    }
+                }
+
+                return;
+            }
+
+            // =========================
+            // REJECTED BY ADMIN
+            // checker only
+            // =========================
+
+            if (workflowStatus === "Rejected By Admin") {
+
+                if (userType === "ncd_checker") {
+
+                    const checkerBox =
+                        document.querySelector("button[value='verify']")
+                ?.closest(".save-reject_btn");
+
+                    if (checkerBox) {
+
+                        checkerBox.style.display = "block";
+
+                        // hide verify button
+                        const verifyBtn =
+                            checkerBox.querySelector("button[value='verify']");
+
+                        if (verifyBtn) {
+                            verifyBtn.style.display = "none";
+                        }
+
+                        // show reject button only
+                        const rejectBtn =
+                            checkerBox.querySelector("button[onclick='toggleCheckerReject()']");
+
+                        if (rejectBtn) {
+                            rejectBtn.style.display = "inline-block";
+                        }
+                    }
+                }
+
+                return;
+            }
+
+
+            // =========================
+            // MAKER LEVEL
+            // maker only
+            // =========================
+
+            if (workflowStatus === "At Maker Level") {
+
+                if (userType === "ncd_maker") {
+
+                    if (makerButtons) {
+                        makerButtons.style.display = "block";
+                    }
+                }
+
+                return;
+            }
+
+            // =========================
+            // CHECKER LEVEL
+            // checker only
+            // =========================
+
+            if (workflowStatus === "At Checker Level") {
+
+                if (userType === "ncd_checker") {
+
+                    if (checkerVerifyBtn) {
+                        checkerVerifyBtn.closest(".save-reject_btn").style.display = "block";
+                    }
+                }
+
+                return;
+            }
+
+            // =========================
+            // ADMIN LEVEL
+            // admin only
+            // =========================
+
+            if (workflowStatus === "At Admin Level") {
+
+                if (userType === "ncd_admin") {
+
+                    if (adminApproveBtn) {
+                        adminApproveBtn.closest(".save-reject_btn").style.display = "block";
+                    }
+                }
+
+                return;
+            }
+
+        });
+
+    </script>
+<?php
+page_footer_start();
+page_footer_end();
+?>
