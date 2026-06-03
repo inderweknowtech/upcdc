@@ -84,7 +84,7 @@ function page_header_start($title='Survey Form') {
     <link href="css/pe-icon-7-stroke.css" rel="stylesheet"  media="all" />
 
     <!-- Bootstrap core CSS     -->
-    <link rel="stylesheet" href="css/bootstrap.min.css" media="all">
+    <link rel="stylesheet" href="css/bootstrap.min.css" media="all"> 
 	<link rel="stylesheet" href="css/bootstrap-theme.min.css" media="all">
 	<link rel="stylesheet" href="dataTables/datatables.min.css" media="all">
 	<script src="js/jquery.3.2.1.min.js" type="text/javascript"></script>
@@ -340,6 +340,29 @@ function page_header_end(){
 
 function page_sidebar($id=''){
 ?>
+<style>
+    .footer-brand{
+        display:inline-flex;
+        align-items:center;
+        gap:10px; /* space between image & text */
+
+        font-size:20px;
+        font-weight:600;
+
+        color:#333;
+        text-decoration:none;
+    }
+
+    .footer-brand:hover{
+        text-decoration:none;
+        color:#ff7a00;
+    }
+
+    .footer-logo{
+        height:38px;
+        width:auto;
+    }
+</style>
 		<div class="sidebar" data-color="blue" data-image="images/sidebar-5.jpg" style="z-index: 999;">
 		<!--
 
@@ -368,17 +391,24 @@ function page_sidebar($id=''){
                     </li>
                     <?php endif; ?>
 
-                <!--NCD Maker Navigation Link-->
+
+
+
+                <!--Allied Department Maker Navigation Link-->
+                    <!-- =========================
+                         VIEW Allied Department REPORTS
+                    ========================= -->
+
                     <?php if (
                         isset($_SESSION['user_type']) &&
-                        in_array($_SESSION['user_type'], ['ncd_admin', 'ncd_checker'])
+                        in_array($_SESSION['user_type'], ['allied_dept_admin', 'allied_dept_checker', 'allied_dept_maker', 'sadmin'])
                     ): ?>
 
                         <li class="nav-item active">
                             <a class="nav-link"
-                               href="Ncd_Reports/add_ncd_user.php?usertype=<?php echo urlencode($_SESSION['user_type']); ?>">
-                                <i class="fas fa-user-plus"></i>
-                                <p>Create Maker ID</p>
+                               href="allied_department_listing.php">
+                                <i class="far fa-chart-bar"></i>
+                                <p>View</p>
                             </a>
                         </li>
 
@@ -386,19 +416,123 @@ function page_sidebar($id=''){
 
                     <?php if (
                         isset($_SESSION['user_type']) &&
-                        in_array($_SESSION['user_type'], ['ncd_admin', 'ncd_checker', 'ncd_maker'])
+                        in_array($_SESSION['user_type'], ['allied_dept_admin', 'allied_dept_checker', 'allied_dept_maker' , 'sadmin'])
                     ): ?>
 
                         <li class="nav-item active">
                             <a class="nav-link"
-                               href="Ncd_Reports/dashboard_cooperatives.php">
-                                <i class="fas fa-user-plus"></i>
-                                <p>VIew NCD Reports</p>
+                               href="#">
+                                <i class="far fa-chart-bar"></i>
+                                <p>VIew Land Reports</p>
+                            </a>
+                        </li>
+                        <li class="nav-item active">
+                            <a class="nav-link"
+                               href="#">
+                                <i class="far fa-chart-bar"></i>
+                                <p>VIew ManPower Reports</p>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+
+                    <!-- =========================
+                         Allied Department USER MANAGEMENT MENU
+                    ========================= -->
+
+                    <?php if (
+                        isset($_SESSION['user_type']) &&
+                        in_array($_SESSION['user_type'], ['allied_dept_admin', 'allied_dept_checker'])
+                    ): ?>
+
+                        <li class="nav-item">
+
+                            <a data-toggle="collapse"
+                               data-target="#ncdUserManagement"
+                               class="nav-link collapsed"
+                               href="#ncdUserManagement"
+                               aria-expanded="false">
+
+                                <i class="fa fa-users"></i>
+
+                                <p>
+                                    User Management
+                                    <b class="caret"  style="margin-left:8px;"></b>
+                                </p>
+                            </a>
+
+                            <div class="collapse" id="ncdUserManagement">
+
+                                <ul class="nav">
+
+                                    <!-- =========================
+                                         ADMIN -> CREATE CHECKER
+                                    ========================== -->
+
+                                    <?php if ($_SESSION['user_type'] === 'allied_dept_admin'): ?>
+
+                                        <li class="nav-item">
+
+                                            <a class="nav-link"
+                                               href="add_allied_dept_users.php?usertype=<?php echo urlencode($_SESSION['user_type']); ?>">
+
+                                                <i class="fa fa-user-plus"
+                                                   style="font-size:20px; margin-left:15px; margin-right:0px;">
+                                                </i>
+
+                                                <span class="sidebar-mini"></span>
+
+                                                <span class="sidebar-normal">
+                                                    Create Checker ID
+                                                </span>
+
+                                            </a>
+
+                                        </li>
+
+                                    <?php endif; ?>
+
+
+                                    <!-- =========================
+                                         CHECKER -> CREATE MAKER
+                                    ========================== -->
+
+                                    <?php if ($_SESSION['user_type'] === 'allied_dept_checker'): ?>
+
+                                        <li class="nav-item">
+                                            <a class="nav-link"
+                                               href="add_allied_dept_users.php?usertype=<?php echo urlencode($_SESSION['user_type']); ?>">
+
+                                                <i class="fa fa-user-plus"
+                                                   style="font-size:20px; margin-left:15px; margin-right:0px;">
+                                                </i>
+
+                                                <span class="sidebar-mini"></span>
+
+                                                <span class="sidebar-normal">
+                                                    Create Maker ID
+                                                </span>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <li class="nav-item active">
+                            <a class="nav-link"
+                               href="signout.php">
+                                <i class="fa fa-user-lock"></i>
+                                <p>SignOut</p>
                             </a>
                         </li>
 
                     <?php endif; ?>
-                <!-- NCD Maker Navigation Link-->
+
+<!--                <!-- Allied Department Maker Navigation Link-->
+
+
+
 
                     <?php
 					$sql = 'select * from navigation where (parent is null or parent="" or parent="P") and hyper_link!="index.php" order by abs(sort_no), sub_parent, link_description';
@@ -536,12 +670,17 @@ function page_footer_start() {
 							</li>
 						</ul>
 					</nav>
-					<p class="copyright text-center">
-                        ©
-                        <script>
-                            document.write(new Date().getFullYear())
-                        </script>
-                        <a href="http://www.webprotechnologies.com" target="_blank"><img src="images/logo2.gif" style="height:20px;" class="img-rounded">WebPro Technologies</a>
+                    <p class="copyright text-center">
+
+                        <a href="http://www.upcdc.in" target="_blank" class="footer-brand">
+
+                            <img src="images/coop_logo.png"
+                                 class="img-rounded footer-logo">
+
+                            <span>UPCDC</span>
+
+                        </a>
+
                     </p>
 				</div>
 			</footer>

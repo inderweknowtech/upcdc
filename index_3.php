@@ -13,16 +13,17 @@ if (isset($_POST['submit'])) {
 
 
 
-// ================= NCD LOGIN START =================
+
+    // ================= ALLIED DEPT LOGIN START =================
 
     $username = trim($_POST['username'] ?? '');
     $password = trim($_POST['userpwd'] ?? '');
 
     if ($username !== '' && $password !== '') {
 
-        $sql = "SELECT u.*, t.type_name 
-            FROM ncd_users u
-            JOIN ncd_user_type t ON u.type_id = t.id
+        $sql = "SELECT u.*, t.type_name
+            FROM allied_dept_users u
+            JOIN allied_dept_user_type t ON u.type_id = t.id
             WHERE u.u_name = '$username'
             AND u.u_pass = '$password'
             AND u.is_active = 1
@@ -35,38 +36,48 @@ if (isset($_POST['submit'])) {
             $row = mysqli_fetch_assoc($result);
 
             // -------- SESSION COMMON --------
-            $_SESSION['ncd_user']     = true;
-            $_SESSION['usersno']  = $row['id'];
-            $_SESSION['username']     = $row['u_name'];
-            $_SESSION['name']    = $row['name'];
-            $_SESSION['usertype']     = $row['type_name'];
-            $_SESSION['user_type']     = $row['type_name'];
 
-            // ⭐ IMPORTANT (MISSING BEFORE)
-            $_SESSION['admin_session'] = 1;
+            $_SESSION['allied_dept_user'] = true;
+
+            $_SESSION['usersno']  = $row['sno'];
+            $_SESSION['username'] = $row['u_name'];
+            $_SESSION['name']     = $row['name'];
+
+            $_SESSION['usertype']  = $row['type_name'];
+            $_SESSION['user_type'] = $row['type_name'];
+
+            $_SESSION['department_authority_id'] = $row['department_authority_id'];
+
+            $_SESSION['admin_session']   = 1;
             $_SESSION['show_links_page'] = 1;
 
             // -------- ROLE BASED --------
-            if ($row['type_name'] === 'ncd_checker') {
+
+            if ($row['type_name'] === 'allied_dept_checker') {
+
                 $_SESSION['division_id']   = $row['division_id'];
                 $_SESSION['division_name'] = $row['division_name'];
             }
 
-            if ($row['type_name'] === 'ncd_maker') {
+            if ($row['type_name'] === 'allied_dept_maker') {
+
                 $_SESSION['district_id']   = $row['district_id'];
                 $_SESSION['district_name'] = $row['district_name'];
+                $_SESSION['division_id'] = $row['division_id'];
             }
 
             // -------- REDIRECT --------
-            header("Location: index_3.php");
+
+            header("Location: allied_dept_index.php");
             exit;
+
         } else {
-            $msg = '<h4 class="alert alert-danger">Invalid NCD Username or Password</h4>';
+
+            $msg = '<h4 class="alert alert-danger">Invalid Username or Password</h4>';
         }
     }
 
-// ================= NCD LOGIN END =================
-
+// ================= ALLIED DEPT LOGIN END =================
 
 
     if (isset($_POST['mobile_number'])) {
